@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block title %}Чаты - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="bi bi-chat-dots"></i> Все чаты
+            </h1>
+            <div>
+                <button class="btn btn-outline-secondary" id="refreshChats">
+                    <i class="bi bi-arrow-clockwise"></i> Обновить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="input-group">
+            <span class="input-group-text">
+                <i class="bi bi-search"></i>
+            </span>
+            <input type="text" class="form-control" id="chatFilter" placeholder="Поиск по названию чата...">
+        </div>
+    </div>
+    <div class="col-md-3">
+        <select class="form-select" id="typeFilter">
+            <option value="">Все типы</option>
+            <option value="User">Личные чаты</option>
+            <option value="Chat">Группы</option>
+            <option value="Channel">Каналы</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <select class="form-select" id="sortBy">
+            <option value="messages">По сообщениям</option>
+            <option value="name">По названию</option>
+            <option value="date">По дате</option>
+        </select>
+    </div>
+</div>
+
+<!-- Статистика -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="text-primary">{{ chats|length }}</h5>
+                <small class="text-muted">Всего чатов</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="text-success">{{ chats|selectattr("type", "equalto", "User")|list|length }}</h5>
+                <small class="text-muted">Личные чаты</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="text-info">{{ chats|selectattr("type", "equalto", "Chat")|list|length }}</h5>
+                <small class="text-muted">Группы</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="text-warning">{{ chats|selectattr("type", "equalto", "Channel")|list|length }}</h5>
+                <small class="text-muted">Каналы</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Список чатов -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-ul"></i> Список чатов
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                {% if chats %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="chatsTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Чат</th>
+                                    <th>Тип</th>
+                                    <th>Сообщений</th>
+                                    <th>Участников</th>
+                                    <th>Изменений</th>
+                                    <th>Последнее</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for chat in chats %}
+                                <tr data-chat-type="{{ chat.type }}" data-chat-name="{{ chat.name|lower }}">
+                                    <td>{{ loop.index }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if chat.type == 'User' %}
+                                                <i class="bi bi-person-circle text-success me-2"></i>
+                                            {% elif chat.type == 'Chat' %}
+                                                <i class="bi bi-people-fill text-info me-2"></i>
+                                            {% elif chat.type == 'Channel' %}
+                                                <i class="bi bi-broadcast text-warning me-2"></i>
+                                            {% else %}
+                                                <i class="bi bi-chat-dots text-secondary me-2"></i>
+                                            {% endif %}
+                                            <div>
+                                                <div class="fw-bold">
+                                                    {{ chat.name[:40] }}{% if chat.name|length > 40 %}...{% endif %}
+                                                </div>
+                                                <small class="text-muted">ID: {{ chat.id }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ chat.type }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">
+                                            {{ "{:,}".format(chat.total_messages) }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if chat.unique_senders %}
+                                            <span class="badge bg-info">{{ chat.unique_senders }}</span>
+                                        {% else %}
+                                            <span class="text-muted">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% set edits = chat.edited_count or 0 %}
+                                        {% set deletes = chat.deleted_count or 0 %}
+                                        {% if edits + deletes > 0 %}
+                                            <span class="badge bg-warning">{{ edits + deletes }}</span>
+                                        {% else %}
+                                            <span class="text-muted">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if chat.last_message %}
+                                            <small class="text-muted">
+                                                {{ chat.last_message[:10] }}
+                                            </small>
+                                        {% else %}
+                                            <small class="text-muted">N/A</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('chat_detail', chat_id=chat.id) }}" 
+                                               class="btn btn-sm btn-outline-primary" 
+                                               data-bs-toggle="tooltip" 
+                                               title="Детали чата">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <button class="btn btn-sm btn-outline-success" 
+                                                    data-export-type="chat" 
+                                                    data-chat-id="{{ chat.id }}"
+                                                    data-bs-toggle="tooltip" 
+                                                    title="Экспорт для AI">
+                                                <i class="bi bi-robot"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-info" 
+                                                    onclick="loadChatStats({{ chat.id }})"
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#chatStatsModal"
+                                                    data-bs-toggle="tooltip" 
+                                                    title="Быстрая статистика">
+                                                <i class="bi bi-graph-up"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox fs-1 text-muted"></i>
+                        <h5 class="text-muted mt-3">Нет чатов для отображения</h5>
+                        <p class="text-muted">Выполните парсинг чтобы увидеть данные здесь</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal для быстрой статистики -->
+<div class="modal fade" id="chatStatsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-graph-up"></i> Статистика чата
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="chatStatsContent">
+                <div class="text-center py-4">
+                    <div class="loading"></div>
+                    <p class="mt-2">Загрузка статистики...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Фильтрация чатов
+document.getElementById('chatFilter').addEventListener('input', filterChats);
+document.getElementById('typeFilter').addEventListener('change', filterChats);
+document.getElementById('sortBy').addEventListener('change', sortChats);
+
+function filterChats() {
+    const nameFilter = document.getElementById('chatFilter').value.toLowerCase();
+    const typeFilter = document.getElementById('typeFilter').value;
+    const rows = document.querySelectorAll('#chatsTable tbody tr');
+    
+    rows.forEach(row => {
+        const chatName = row.dataset.chatName;
+        const chatType = row.dataset.chatType;
+        
+        const nameMatch = !nameFilter || chatName.includes(nameFilter);
+        const typeMatch = !typeFilter || chatType === typeFilter;
+        
+        row.style.display = nameMatch && typeMatch ? '' : 'none';
+    });
+}
+
+function sortChats() {
+    const sortBy = document.getElementById('sortBy').value;
+    const tbody = document.querySelector('#chatsTable tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    rows.sort((a, b) => {
+        if (sortBy === 'messages') {
+            const aCount = parseInt(a.querySelector('.badge.bg-primary').textContent.replace(/,/g, ''));
+            const bCount = parseInt(b.querySelector('.badge.bg-primary').textContent.replace(/,/g, ''));
+            return bCount - aCount;
+        } else if (sortBy === 'name') {
+            return a.dataset.chatName.localeCompare(b.dataset.chatName);
+        }
+        return 0;
+    });
+    
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Загрузка статистики чата
+async function loadChatStats(chatId) {
+    const content = document.getElementById('chatStatsContent');
+    
+    try {
+        const response = await fetch(`/api/chat-stats/${chatId}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            content.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Основная информация</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>Название:</strong> ${data.basic_stats.name}</li>
+                            <li><strong>Тип:</strong> ${data.basic_stats.type}</li>
+                            <li><strong>Сообщений:</strong> ${data.basic_stats.total_messages.toLocaleString()}</li>
+                            <li><strong>Участников:</strong> ${data.basic_stats.unique_senders || 'N/A'}</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Активность по времени</h6>
+                        <canvas id="modalTimeChart" height="150"></canvas>
+                    </div>
+                </div>
+            `;
+            
+            // Создаем график
+            if (data.time_analysis && data.time_analysis.by_hour) {
+                const ctx = document.getElementById('modalTimeChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.time_analysis.by_hour.map(h => h.hour + ':00'),
+                        datasets: [{
+                            label: 'Сообщений',
+                            data: data.time_analysis.by_hour.map(h => h.count),
+                            borderColor: 'rgba(13, 110, 253, 1)',
+                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { beginAtZero: true }
+                        },
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
+            }
+        } else {
+            content.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Ошибка загрузки: ${data.error}
+                </div>
+            `;
+        }
+    } catch (error) {
+        content.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                Ошибка: ${error.message}
+            </div>
+        `;
+    }
+}
+
+// Обновление списка чатов
+document.getElementById('refreshChats').addEventListener('click', function() {
+    location.reload();
+});
+
+// Инициализация сортировки по умолчанию
+document.addEventListener('DOMContentLoaded', function() {
+    sortChats();
+});
+</script>
+{% endblock %}

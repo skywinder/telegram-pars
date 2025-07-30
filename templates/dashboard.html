@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Главная - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-speedometer2"></i> Дашборд
+        </h1>
+    </div>
+</div>
+
+<!-- Статистические карточки -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Всего чатов</h6>
+                        <h2 class="mb-0">{{ total_chats }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-chat-dots fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Всего сообщений</h6>
+                        <h2 class="mb-0">{{ "{:,}".format(total_messages) }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-envelope fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Изменений за неделю</h6>
+                        <h2 class="mb-0">
+                            {% if changes_summary and changes_summary.changes_by_type %}
+                                {{ changes_summary.changes_by_type | sum(attribute='count') }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-pencil-square fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Среднее на чат</h6>
+                        <h2 class="mb-0">
+                            {% if total_chats > 0 %}
+                                {{ "%.0f"|format(total_messages / total_chats) }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-bar-chart fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Топ чатов -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-trophy"></i> Самые активные чаты
+                </h5>
+                <a href="{{ url_for('chats') }}" class="btn btn-sm btn-outline-primary">
+                    Все чаты <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+            <div class="card-body">
+                {% if stats %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Название чата</th>
+                                    <th>Сообщений</th>
+                                    <th>Участников</th>
+                                    <th>Последнее сообщение</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for chat in stats %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>
+                                        <i class="bi bi-chat-left-dots text-primary me-2"></i>
+                                        <span class="fw-bold">{{ chat.name[:30] }}{% if chat.name|length > 30 %}...{% endif %}</span>
+                                        <br>
+                                        <small class="text-muted">{{ chat.type }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ "{:,}".format(chat.total_messages) }}</span>
+                                    </td>
+                                    <td>{{ chat.unique_senders or 'N/A' }}</td>
+                                    <td>
+                                        {% if chat.last_message %}
+                                            <small class="text-muted">{{ chat.last_message[:10] }}</small>
+                                        {% else %}
+                                            <small class="text-muted">N/A</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('chat_detail', chat_id=chat.id) }}" 
+                                           class="btn btn-sm btn-outline-info">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-inbox fs-1 text-muted"></i>
+                        <p class="text-muted mt-2">Нет данных для отображения</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Недавние изменения -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history"></i> Последние изменения
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if changes_summary and changes_summary.changes_by_type %}
+                    {% for change in changes_summary.changes_by_type %}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                {% if change.action_type == 'created' %}
+                                    <i class="bi bi-plus-circle text-success me-2"></i>
+                                    <span>Создано</span>
+                                {% elif change.action_type == 'edited' %}
+                                    <i class="bi bi-pencil text-warning me-2"></i>
+                                    <span>Отредактировано</span>
+                                {% elif change.action_type == 'deleted' %}
+                                    <i class="bi bi-trash text-danger me-2"></i>
+                                    <span>Удалено</span>
+                                {% else %}
+                                    <i class="bi bi-question-circle text-muted me-2"></i>
+                                    <span>{{ change.action_type.title() }}</span>
+                                {% endif %}
+                            </div>
+                            <span class="badge bg-secondary">{{ change.count }}</span>
+                        </div>
+                    {% endfor %}
+                    
+                    {% if changes_summary.most_active_chats %}
+                        <hr>
+                        <h6 class="text-muted">Активные чаты:</h6>
+                        {% for chat in changes_summary.most_active_chats[:3] %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <small>{{ chat.chat_name[:20] }}{% if chat.chat_name|length > 20 %}...{% endif %}</small>
+                                <small class="text-muted">{{ chat.changes_count }} изм.</small>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="bi bi-check-circle fs-3 text-success"></i>
+                        <p class="text-muted small mb-0">Нет изменений за последнюю неделю</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Быстрые действия -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-lightning"></i> Быстрые действия
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('analytics_page') }}" class="btn btn-primary">
+                        <i class="bi bi-graph-up"></i> Открыть аналитику
+                    </a>
+                    <a href="{{ url_for('export_page') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-download"></i> Экспорт данных
+                    </a>
+                    <a href="{{ url_for('search_page') }}" class="btn btn-outline-info">
+                        <i class="bi bi-search"></i> Поиск сообщений
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- График активности (если есть данные) -->
+{% if stats %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-bar-chart-line"></i> Активность чатов
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="chatsChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if stats %}
+<script>
+// График активности чатов
+const ctx = document.getElementById('chatsChart').getContext('2d');
+const chatsData = {{ stats | tojson }};
+
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: chatsData.map(chat => chat.name.length > 15 ? chat.name.substring(0, 15) + '...' : chat.name),
+        datasets: [{
+            label: 'Количество сообщений',
+            data: chatsData.map(chat => chat.total_messages),
+            backgroundColor: 'rgba(13, 110, 253, 0.8)',
+            borderColor: 'rgba(13, 110, 253, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

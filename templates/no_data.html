@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Нет данных - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 text-center">
+        <div class="card border-warning">
+            <div class="card-body py-5">
+                <i class="bi bi-exclamation-triangle fs-1 text-warning mb-3"></i>
+                <h2 class="card-title text-warning">База данных не найдена</h2>
+                <p class="card-text lead">
+                    Для работы веб-интерфейса необходимо сначала выполнить парсинг Telegram чатов.
+                </p>
+                
+                <div class="alert alert-info text-start mt-4">
+                    <h5 class="alert-heading">
+                        <i class="bi bi-info-circle"></i> Что нужно сделать:
+                    </h5>
+                    <ol class="mb-0">
+                        <li>Закройте веб-интерфейс</li>
+                        <li>Запустите парсер: <code>python main_advanced.py</code></li>
+                        <li>Выполните парсинг хотя бы одного чата</li>
+                        <li>Снова запустите веб-интерфейс: <code>python web_interface.py</code></li>
+                    </ol>
+                </div>
+                
+                <div class="mt-4">
+                    <button class="btn btn-primary me-2" onclick="location.reload()">
+                        <i class="bi bi-arrow-clockwise"></i> Обновить страницу
+                    </button>
+                    <a href="#" class="btn btn-outline-secondary" onclick="window.close()">
+                        <i class="bi bi-x-circle"></i> Закрыть
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Дополнительная информация -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-question-circle"></i> Нужна помощь?
+                </h5>
+            </div>
+            <div class="card-body text-start">
+                <h6>Быстрый старт:</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-primary">1. Настройка API</h6>
+                        <ul class="small">
+                            <li>Перейдите на <a href="https://my.telegram.org" target="_blank">my.telegram.org</a></li>
+                            <li>Создайте приложение</li>
+                            <li>Получите API_ID и API_HASH</li>
+                            <li>Создайте файл <code>.env</code></li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-success">2. Первый парсинг</h6>
+                        <ul class="small">
+                            <li>Запустите <code>python main_advanced.py</code></li>
+                            <li>Авторизуйтесь в Telegram</li>
+                            <li>Выберите чат для парсинга</li>
+                            <li>Дождитесь завершения</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="alert alert-light mt-3">
+                    <small class="text-muted">
+                        <i class="bi bi-shield-check"></i>
+                        <strong>Безопасность:</strong> Все данные обрабатываются локально. 
+                        API ключи и сообщения не передаются в интернет.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
