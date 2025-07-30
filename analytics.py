@@ -118,20 +118,23 @@ class TelegramAnalytics:
             word_counter = Counter()
             total_messages = len(messages)
             
-            # Стоп-слова (можно расширить)
+            # Стоп-слова (расширенный список)
             stop_words = {'что', 'как', 'где', 'когда', 'кто', 'это', 'для', 'или', 
                          'так', 'уже', 'все', 'еще', 'вот', 'там', 'тут', 'она', 
                          'они', 'его', 'ему', 'нее', 'них', 'мне', 'нас', 'вас',
-                         'the', 'and', 'you', 'that', 'was', 'for', 'are', 'with'}
+                         'the', 'and', 'you', 'that', 'was', 'for', 'are', 'with',
+                         'https', 'http', 'www', 'com', 'org', 'net', 'status',
+                         'this', 'they', 'from', 'have', 'been', 'will', 'more',
+                         'чем', 'тем', 'том', 'под', 'при', 'без', 'над', 'про'}
             
             for (text,) in messages:
                 if text:
-                    # Извлекаем слова (только буквы, минимум 4 символа)
-                    words = re.findall(r'\b[а-яёa-z]{' + str(min_word_length) + ',}\b', 
-                                     text.lower())
+                    # Извлекаем слова (только буквы, минимум нужной длины)
+                    words = re.findall(r'[а-яёa-z]+', text.lower())
                     
-                    # Фильтруем стоп-слова
-                    filtered_words = [w for w in words if w not in stop_words]
+                    # Фильтруем по длине и стоп-словам
+                    filtered_words = [w for w in words 
+                                    if len(w) >= min_word_length and w not in stop_words]
                     word_counter.update(filtered_words)
             
             # Топ слов
