@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+
+{% block title %}Поиск - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-search"></i> Поиск по сообщениям
+        </h1>
+        <p class="lead text-muted">
+            Найдите нужные сообщения по тексту, дате или чату.
+        </p>
+    </div>
+</div>
+
+<!-- Форма поиска -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-funnel"></i> Параметры поиска
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="searchQuery" class="form-label">Поисковый запрос:</label>
+                        <div class="search-container">
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="searchInput" 
+                                   placeholder="Введите текст для поиска (минимум 3 символа)..."
+                                   autocomplete="off">
+                            <div id="searchResults" class="search-results" style="display: none;"></div>
+                        </div>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i>
+                            Поиск выполняется по содержимому сообщений
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="searchChatId" class="form-label">Фильтр по чату:</label>
+                        <select class="form-select" id="searchChatId">
+                            <option value="">Все чаты</option>
+                            <!-- Чаты будут загружены через JavaScript -->
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="searchLimit" class="form-label">Количество результатов:</label>
+                        <select class="form-select" id="searchLimit">
+                            <option value="10">10 результатов</option>
+                            <option value="20" selected>20 результатов</option>
+                            <option value="50">50 результатов</option>
+                            <option value="100">100 результатов</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <button class="btn btn-primary me-2" onclick="performAdvancedSearch()">
+                            <i class="bi bi-search"></i> Расширенный поиск
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="clearSearch()">
+                            <i class="bi bi-x-circle"></i> Очистить
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Результаты поиска -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-ul"></i> Результаты поиска
+                </h5>
+                <span class="badge bg-primary" id="resultsCount">0 результатов</span>
+            </div>
+            <div class="card-body" id="searchResultsContainer">
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-search fs-1"></i>
+                    <p class="mt-2">Введите запрос для поиска</p>
+                    <small>Подсказка: используйте Ctrl+K для быстрого доступа к поиску</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Популярные запросы / Недавние поиски -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-clock-history"></i> Недавние поиски
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="recentSearches">
+                    <p class="text-muted text-center">Нет недавних поисков</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-lightbulb"></i> Советы по поиску
+                </h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled small mb-0">
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Используйте ключевые слова</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Поиск не учитывает регистр</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Минимум 3 символа для поиска</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Фильтруйте по конкретному чату</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Нажмите Ctrl+K для быстрого поиска</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let searchHistory = JSON.parse(localStorage.getItem('telegram_search_history') || '[]');
+
+// Загрузка чатов для фильтра
+document.addEventListener('DOMContentLoaded', function() {
+    loadChatsForFilter();
+    loadRecentSearches();
+});
+
+async function loadChatsForFilter() {
+    try {
+        // Здесь должен быть реальный API вызов для получения чатов
+        // Пока используем заглушку
+        const chatSelect = document.getElementById('searchChatId');
+        chatSelect.innerHTML = `
+            <option value="">Все чаты</option>
+            <option value="123">Личный чат с Петей</option>
+            <option value="456">Группа "Друзья"</option>
+            <option value="789">Канал "Новости"</option>
+        `;
+    } catch (error) {
+        console.error('Ошибка загрузки чатов:', error);
+    }
+}
+
+async function performAdvancedSearch() {
+    const query = document.getElementById('searchInput').value.trim();
+    const chatId = document.getElementById('searchChatId').value;
+    const limit = document.getElementById('searchLimit').value;
+    
+    if (query.length < 3) {
+        showNotification('error', 'Запрос должен содержать минимум 3 символа');
+        return;
+    }
+    
+    // Добавляем в историю поиска
+    addToSearchHistory(query, chatId);
+    
+    // Показываем загрузку
+    showSearchLoading();
+    
+    try {
+        const params = new URLSearchParams({
+            q: query,
+            limit: limit
+        });
+        
+        if (chatId) {
+            params.append('chat_id', chatId);
+        }
+        
+        const response = await fetch(`/api/search?${params}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            displayAdvancedSearchResults(data.results, data.query);
+            updateResultsCount(data.results.length);
+        } else {
+            showSearchError(data.error);
+        }
+    } catch (error) {
+        showSearchError('Ошибка поиска: ' + error.message);
+    }
+}
+
+function showSearchLoading() {
+    const container = document.getElementById('searchResultsContainer');
+    container.innerHTML = `
+        <div class="text-center py-4">
+            <div class="loading"></div>
+            <p class="mt-2">Поиск по сообщениям...</p>
+        </div>
+    `;
+}
+
+function displayAdvancedSearchResults(results, query) {
+    const container = document.getElementById('searchResultsContainer');
+    
+    if (results.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-5">
+                <i class="bi bi-search fs-1 text-muted"></i>
+                <h5 class="mt-3 text-muted">Ничего не найдено</h5>
+                <p class="text-muted">Попробуйте изменить поисковый запрос</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '<div class="list-group list-group-flush">';
+    
+    results.forEach((result, index) => {
+        const highlightedText = highlightSearchTerm(escapeHtml(result.text), query);
+        const date = new Date(result.date);
+        const timeAgo = getTimeAgo(date);
+        
+        html += `
+            <div class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">
+                                <i class="bi bi-chat-left-dots text-primary me-2"></i>
+                                ${escapeHtml(result.chat_name)}
+                            </h6>
+                            <small class="text-muted">${timeAgo}</small>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="bi bi-person me-1"></i>
+                                ${escapeHtml(result.sender_name)}
+                            </small>
+                        </div>
+                        <p class="mb-1">${highlightedText}</p>
+                        <small class="text-muted">
+                            <i class="bi bi-calendar3 me-1"></i>
+                            ${date.toLocaleString('ru-RU')}
+                        </small>
+                    </div>
+                    <div class="ms-3">
+                        <button class="btn btn-sm btn-outline-primary" 
+                                onclick="goToMessage(${result.chat_id}, ${result.id})"
+                                data-bs-toggle="tooltip" 
+                                title="Перейти к сообщению">
+                            <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+    
+    // Инициализируем тултипы
+    const tooltipTriggerList = [].slice.call(container.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+}
+
+function showSearchError(error) {
+    const container = document.getElementById('searchResultsContainer');
+    container.innerHTML = `
+        <div class="alert alert-danger text-center">
+            <i class="bi bi-exclamation-triangle fs-2"></i>
+            <h5 class="mt-2">Ошибка поиска</h5>
+            <p>${escapeHtml(error)}</p>
+        </div>
+    `;
+    updateResultsCount(0);
+}
+
+function updateResultsCount(count) {
+    const counter = document.getElementById('resultsCount');
+    counter.textContent = `${count} результат${count === 1 ? '' : count < 5 ? 'а' : 'ов'}`;
+}
+
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchChatId').value = '';
+    
+    const container = document.getElementById('searchResultsContainer');
+    container.innerHTML = `
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-search fs-1"></i>
+            <p class="mt-2">Введите запрос для поиска</p>
+        </div>
+    `;
+    
+    updateResultsCount(0);
+}
+
+function goToMessage(chatId, messageId) {
+    // Переход к сообщению в чате
+    window.location.href = `/chat/${chatId}#message-${messageId}`;
+}
+
+// Функции для работы с историей поиска
+function addToSearchHistory(query, chatId = '') {
+    const searchItem = {
+        query: query,
+        chatId: chatId,
+        timestamp: new Date().toISOString()
+    };
+    
+    // Удаляем дубликаты
+    searchHistory = searchHistory.filter(item => 
+        !(item.query === query && item.chatId === chatId)
+    );
+    
+    // Добавляем в начало
+    searchHistory.unshift(searchItem);
+    
+    // Оставляем только последние 10
+    searchHistory = searchHistory.slice(0, 10);
+    
+    // Сохраняем в localStorage
+    localStorage.setItem('telegram_search_history', JSON.stringify(searchHistory));
+    
+    // Обновляем отображение
+    loadRecentSearches();
+}
+
+function loadRecentSearches() {
+    const container = document.getElementById('recentSearches');
+    
+    if (searchHistory.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center small">Нет недавних поисков</p>';
+        return;
+    }
+    
+    let html = '';
+    searchHistory.slice(0, 5).forEach(item => {
+        const timeAgo = getTimeAgo(new Date(item.timestamp));
+        html += `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="flex-grow-1">
+                    <button class="btn btn-link btn-sm p-0 text-start" 
+                            onclick="repeatSearch('${escapeHtml(item.query)}', '${item.chatId}')">
+                        <i class="bi bi-clock-history me-1"></i>
+                        ${escapeHtml(item.query)}
+                    </button>
+                    ${item.chatId ? '<br><small class="text-muted">в конкретном чате</small>' : ''}
+                </div>
+                <small class="text-muted">${timeAgo}</small>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function repeatSearch(query, chatId) {
+    document.getElementById('searchInput').value = query;
+    document.getElementById('searchChatId').value = chatId;
+    performAdvancedSearch();
+}
+
+// Вспомогательные функции
+function getTimeAgo(date) {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'только что';
+    if (diffMins < 60) return `${diffMins} мин. назад`;
+    if (diffHours < 24) return `${diffHours} ч. назад`;
+    if (diffDays < 7) return `${diffDays} дн. назад`;
+    
+    return date.toLocaleDateString('ru-RU');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function highlightSearchTerm(text, term) {
+    if (!term || text.length > 500) {
+        // Для длинных текстов показываем сокращенную версию
+        return text.length > 200 ? text.substring(0, 200) + '...' : text;
+    }
+    
+    const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return text.replace(regex, '<mark>$1</mark>');
+}
+
+// Автофокус на поле поиска при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('searchInput').focus();
+});
+
+// Поиск по Enter
+document.getElementById('searchInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        performAdvancedSearch();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,440 @@
+{% extends "base.html" %}
+
+{% block title %}Инициаторы диалогов - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-chat-left-text"></i> Анализ инициаторов диалогов
+        </h1>
+        <p class="lead text-muted">
+            Узнайте, кто чаще всего начинает разговоры в ваших чатах.
+        </p>
+    </div>
+</div>
+
+{% if starters and not starters.get('error') %}
+<!-- Общая статистика -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-primary text-white">
+            <div class="card-body">
+                <i class="bi bi-chat-dots fs-1 mb-2"></i>
+                <h4>{{ "{:,}".format(starters.total_conversations) }}</h4>
+                <small>Всего диалогов</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <i class="bi bi-clock fs-1 mb-2"></i>
+                <h4>{{ "%.1f"|format(starters.average_gap_hours) }}</h4>
+                <small>Часов между диалогами</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-info text-white">
+            <div class="card-body">
+                <i class="bi bi-person-check fs-1 mb-2"></i>
+                <h4>{{ starters.conversation_starters|length }}</h4>
+                <small>Активных инициаторов</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-warning text-white">
+            <div class="card-body">
+                <i class="bi bi-calendar-range fs-1 mb-2"></i>
+                <h4>{{ "{:,}".format(starters.analysis_period.total_messages) }}</h4>
+                <small>Сообщений проанализировано</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- График распределения -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-pie-chart"></i> Распределение инициаторов
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="startersChart" height="250"></canvas>
+            </div>
+        </div>
+        
+        <!-- Детальная таблица -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-table"></i> Детальная статистика
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Рейтинг</th>
+                                <th>Инициатор</th>
+                                <th>Диалогов начато</th>
+                                <th>Процент</th>
+                                <th>Визуализация</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for starter in starters.conversation_starters %}
+                            <tr>
+                                <td>
+                                    {% if loop.index == 1 %}
+                                        <span class="badge bg-warning">🥇 {{ loop.index }}</span>
+                                    {% elif loop.index == 2 %}
+                                        <span class="badge bg-secondary">🥈 {{ loop.index }}</span>
+                                    {% elif loop.index == 3 %}
+                                        <span class="badge bg-warning">🥉 {{ loop.index }}</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">{{ loop.index }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                             style="width: 40px; height: 40px;">
+                                            {{ starter.sender_name[0].upper() if starter.sender_name else 'U' }}
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold">{{ starter.sender_name[:30] }}</div>
+                                            <small class="text-muted">ID: {{ starter.sender_id }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ starter.conversations_started }}</span>
+                                </td>
+                                <td>
+                                    <span class="fw-bold {% if starter.percentage > 50 %}text-success{% elif starter.percentage > 30 %}text-warning{% else %}text-muted{% endif %}">
+                                        {{ starter.percentage }}%
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="progress" style="height: 20px; width: 100px;">
+                                        <div class="progress-bar {% if starter.percentage > 50 %}bg-success{% elif starter.percentage > 30 %}bg-warning{% else %}bg-info{% endif %}" 
+                                             style="width: {{ starter.percentage }}%">
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Боковая панель с инсайтами -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-lightbulb"></i> Инсайты
+                </h5>
+            </div>
+            <div class="card-body">
+                {% set top_starter = starters.conversation_starters[0] %}
+                {% set second_starter = starters.conversation_starters[1] if starters.conversation_starters|length > 1 else None %}
+                
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-trophy"></i> Главный инициатор
+                    </h6>
+                    <p class="mb-0">
+                        <strong>{{ top_starter.sender_name }}</strong> начинает {{ top_starter.percentage }}% всех диалогов 
+                        ({{ top_starter.conversations_started }} из {{ starters.total_conversations }})
+                    </p>
+                </div>
+                
+                {% if second_starter %}
+                <div class="alert alert-secondary">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-award"></i> Второе место
+                    </h6>
+                    <p class="mb-0">
+                        <strong>{{ second_starter.sender_name }}</strong> инициирует {{ second_starter.percentage }}% диалогов
+                    </p>
+                </div>
+                {% endif %}
+                
+                {% if starters.average_gap_hours > 24 %}
+                <div class="alert alert-warning">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-clock-history"></i> Длинные паузы
+                    </h6>
+                    <p class="mb-0">
+                        В среднем между диалогами проходит {{ "%.1f"|format(starters.average_gap_hours) }} часов. 
+                        Это более суток!
+                    </p>
+                </div>
+                {% elif starters.average_gap_hours < 2 %}
+                <div class="alert alert-success">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-lightning"></i> Активное общение
+                    </h6>
+                    <p class="mb-0">
+                        Короткие паузы между диалогами ({{ "%.1f"|format(starters.average_gap_hours) }} ч.) 
+                        говорят об активном общении.
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Период анализа -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-calendar3"></i> Период анализа
+                </h6>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-4">С:</dt>
+                    <dd class="col-sm-8">
+                        <small>{{ starters.analysis_period.from[:10] if starters.analysis_period.from else 'N/A' }}</small>
+                    </dd>
+                    
+                    <dt class="col-sm-4">По:</dt>
+                    <dd class="col-sm-8">
+                        <small>{{ starters.analysis_period.to[:10] if starters.analysis_period.to else 'N/A' }}</small>
+                    </dd>
+                    
+                    <dt class="col-sm-4">Сообщений:</dt>
+                    <dd class="col-sm-8">
+                        <span class="badge bg-info">{{ "{:,}".format(starters.analysis_period.total_messages) }}</span>
+                    </dd>
+                </dl>
+            </div>
+        </div>
+        
+        <!-- Экспорт -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-download"></i> Экспорт данных
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary btn-sm" onclick="exportStartersData()">
+                        <i class="bi bi-file-earmark-text"></i> Экспорт в JSON
+                    </button>
+                    <button class="btn btn-outline-success btn-sm" onclick="printReport()">
+                        <i class="bi bi-printer"></i> Печать отчета
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Сравнение инициаторов -->
+{% if starters.conversation_starters|length > 1 %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-bar-chart"></i> Сравнение топ инициаторов
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="comparisonChart" height="150"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<!-- Нет данных или ошибка -->
+<div class="row">
+    <div class="col-12">
+        <div class="text-center py-5">
+            {% if starters and starters.get('error') %}
+                <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
+                <h3 class="mt-4 text-warning">{{ starters.error }}</h3>
+                <p class="text-muted">Попробуйте выполнить парсинг чатов или проверьте данные</p>
+            {% else %}
+                <i class="bi bi-chat-left-text display-1 text-muted"></i>
+                <h3 class="mt-4 text-muted">Нет данных об инициаторах диалогов</h3>
+                <p class="text-muted">Выполните парсинг чатов, чтобы увидеть анализ</p>
+            {% endif %}
+            
+            <div class="mt-4">
+                <a href="{{ url_for('index') }}" class="btn btn-primary me-2">
+                    <i class="bi bi-house"></i> На главную
+                </a>
+                <a href="{{ url_for('analytics_page') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-graph-up"></i> Аналитика
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if starters and not starters.get('error') %}
+<script>
+// Данные для графиков
+const startersData = {{ starters.conversation_starters | tojson }};
+
+// Основной график распределения
+if (startersData && startersData.length > 0) {
+    const ctx = document.getElementById('startersChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: startersData.map(s => s.sender_name),
+            datasets: [{
+                data: startersData.map(s => s.percentage),
+                backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                    '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#36A2EB'
+                ],
+                borderWidth: 3,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 15,
+                        usePointStyle: true
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed;
+                            const count = startersData[context.dataIndex].conversations_started;
+                            return `${label}: ${value}% (${count} диалогов)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // График сравнения топ-5
+    if (startersData.length > 1) {
+        const compCtx = document.getElementById('comparisonChart');
+        if (compCtx) {
+            new Chart(compCtx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: startersData.slice(0, 5).map(s => s.sender_name.length > 15 ? 
+                        s.sender_name.substring(0, 15) + '...' : s.sender_name),
+                    datasets: [{
+                        label: 'Процент инициированных диалогов',
+                        data: startersData.slice(0, 5).map(s => s.percentage),
+                        backgroundColor: 'rgba(13, 110, 253, 0.8)',
+                        borderColor: 'rgba(13, 110, 253, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const index = context.dataIndex;
+                                    const starter = startersData[index];
+                                    return `${starter.percentage}% (${starter.conversations_started} диалогов)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+}
+
+// Функции экспорта
+function exportStartersData() {
+    const data = {
+        analysis_date: new Date().toISOString(),
+        total_conversations: {{ starters.total_conversations }},
+        average_gap_hours: {{ starters.average_gap_hours }},
+        starters: startersData
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `conversation_starters_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    showNotification('success', 'Данные экспортированы в JSON файл');
+}
+
+function printReport() {
+    window.print();
+}
+
+// Анимация появления элементов
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.card');
+    cards.forEach((card, index) => {
+        setTimeout(() => {
+            card.classList.add('fade-in');
+        }, index * 100);
+    });
+    
+    // Анимация прогресс-баров
+    const progressBars = document.querySelectorAll('.progress-bar');
+    progressBars.forEach((bar, index) => {
+        setTimeout(() => {
+            bar.style.transition = 'width 1s ease-in-out';
+            bar.style.width = bar.style.width; // Перерисовка
+        }, 500 + index * 100);
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

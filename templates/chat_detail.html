@@ -1,0 +1,545 @@
+{% extends "base.html" %}
+
+{% block title %}{{ report.chat_info.name }} - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1>
+                    {% if report.chat_info.type == 'User' %}
+                        <i class="bi bi-person-circle text-success"></i>
+                    {% elif report.chat_info.type == 'Chat' %}
+                        <i class="bi bi-people-fill text-info"></i>
+                    {% elif report.chat_info.type == 'Channel' %}
+                        <i class="bi bi-broadcast text-warning"></i>
+                    {% endif %}
+                    {{ report.chat_info.name }}
+                </h1>
+                <p class="lead text-muted mb-0">
+                    {{ report.chat_info.type }} • ID: {{ chat_id }}
+                </p>
+            </div>
+            <div>
+                <a href="{{ url_for('chats') }}" class="btn btn-outline-secondary me-2">
+                    <i class="bi bi-arrow-left"></i> Назад к чатам
+                </a>
+                <button class="btn btn-primary" data-export-type="chat" data-chat-id="{{ chat_id }}">
+                    <i class="bi bi-download"></i> Экспорт
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Статистические карточки -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-primary text-white">
+            <div class="card-body">
+                <i class="bi bi-envelope fs-1 mb-2"></i>
+                <h4>{{ "{:,}".format(report.activity_stats.message_count or 0) }}</h4>
+                <small>Всего сообщений</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <i class="bi bi-people fs-1 mb-2"></i>
+                <h4>{{ report.user_stats|length or 0 }}</h4>
+                <small>Участников</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-info text-white">
+            <div class="card-body">
+                <i class="bi bi-calendar-range fs-1 mb-2"></i>
+                <h4>{{ report.activity_stats.active_days or 0 }}</h4>
+                <small>Активных дней</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-warning text-white">
+            <div class="card-body">
+                <i class="bi bi-pencil-square fs-1 mb-2"></i>
+                <h4>
+                    {% if report.changes_analytics and report.changes_analytics.changes_summary %}
+                        {{ report.changes_analytics.changes_summary | sum(attribute='count') }}
+                    {% else %}
+                        0
+                    {% endif %}
+                </h4>
+                <small>Изменений</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Вкладки детального анализа -->
+<ul class="nav nav-tabs mb-4" id="chatDetailTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button">
+            <i class="bi bi-speedometer2"></i> Обзор
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button">
+            <i class="bi bi-people"></i> Участники
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="starters-tab" data-bs-toggle="tab" data-bs-target="#starters" type="button">
+            <i class="bi bi-chat-left-text"></i> Инициаторы
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="emoji-tab" data-bs-toggle="tab" data-bs-target="#emoji" type="button">
+            <i class="bi bi-emoji-smile"></i> Эмодзи
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="time-tab" data-bs-toggle="tab" data-bs-target="#time" type="button">
+            <i class="bi bi-clock"></i> Время
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="chatDetailTabContent">
+    <!-- Обзор -->
+    <div class="tab-pane fade show active" id="overview" role="tabpanel">
+        <div class="row">
+            <div class="col-lg-8 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-graph-up"></i> Активность чата
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="chatActivityChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-info-circle"></i> Информация
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row">
+                            <dt class="col-sm-5">Тип чата:</dt>
+                            <dd class="col-sm-7">
+                                <span class="badge bg-secondary">{{ report.chat_info.type }}</span>
+                            </dd>
+                            
+                            {% if report.activity_stats.first_message %}
+                            <dt class="col-sm-5">Первое сообщение:</dt>
+                            <dd class="col-sm-7">
+                                <small>{{ report.activity_stats.first_message[:10] }}</small>
+                            </dd>
+                            {% endif %}
+                            
+                            {% if report.activity_stats.last_message %}
+                            <dt class="col-sm-5">Последнее:</dt>
+                            <dd class="col-sm-7">
+                                <small>{{ report.activity_stats.last_message[:10] }}</small>
+                            </dd>
+                            {% endif %}
+                            
+                            <dt class="col-sm-5">Ср. длина:</dt>
+                            <dd class="col-sm-7">
+                                {{ "%.1f"|format(report.activity_stats.avg_message_length or 0) }} симв.
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+                
+                <!-- Быстрые действия -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-lightning"></i> Действия
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary btn-sm" 
+                                    data-export-type="conversation" 
+                                    data-chat-id="{{ chat_id }}" 
+                                    data-days="7">
+                                <i class="bi bi-chat-quote"></i> Диалог за неделю
+                            </button>
+                            <button class="btn btn-outline-success btn-sm" 
+                                    onclick="searchInChat({{ chat_id }})">
+                                <i class="bi bi-search"></i> Поиск в чате
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Участники -->
+    <div class="tab-pane fade" id="users" role="tabpanel">
+        {% if report.user_stats %}
+        <div class="row">
+            {% for user in report.user_stats[:12] %}
+            <div class="col-lg-4 col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 50px; height: 50px;">
+                                <i class="bi bi-person"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title mb-1">
+                                    {{ user.full_name.strip() or user.username or ("User_" + user.user_id|string) }}
+                                </h6>
+                                {% if user.username %}
+                                <small class="text-muted">@{{ user.username }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <div class="stat-number">{{ "{:,}".format(user.message_count) }}</div>
+                                <div class="stat-label">Сообщений</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="stat-number">{{ "%.0f"|format(user.avg_message_length or 0) }}</div>
+                                <div class="stat-label">Ср. длина</div>
+                            </div>
+                        </div>
+                        
+                        <div class="progress mt-2" style="height: 5px;">
+                            <div class="progress-bar" 
+                                 style="width: {{ (user.message_count / report.user_stats[0].message_count * 100) if report.user_stats else 0 }}%">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-people fs-1 text-muted"></i>
+            <p class="text-muted mt-2">Нет данных об участниках</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Инициаторы диалогов -->
+    <div class="tab-pane fade" id="starters" role="tabpanel">
+        {% if starters and not starters.get('error') %}
+        <div class="row">
+            <div class="col-lg-8 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-pie-chart"></i> Распределение инициаторов
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="startersChart" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-list-ol"></i> Топ инициаторов
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for starter in starters.conversation_starters[:5] %}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <div class="fw-bold">{{ starter.sender_name[:20] }}</div>
+                                <small class="text-muted">{{ starter.conversations_started }} диалогов</small>
+                            </div>
+                            <span class="badge bg-primary">{{ starter.percentage }}%</span>
+                        </div>
+                        {% endfor %}
+                        
+                        <hr>
+                        <div class="text-center">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle"></i>
+                                Всего диалогов: {{ starters.total_conversations }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-chat-left-text fs-1 text-muted"></i>
+            <p class="text-muted mt-2">
+                {% if starters.get('error') %}
+                    {{ starters.error }}
+                {% else %}
+                    Нет данных об инициаторах диалогов
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Анализ эмодзи -->
+    <div class="tab-pane fade" id="emoji" role="tabpanel">
+        {% if emoji_analysis %}
+        <div class="row">
+            <div class="col-lg-8 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-emoji-smile"></i> Статистика эмодзи
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for user in emoji_analysis.user_expression_stats[:6] %}
+                            <div class="col-lg-6 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title">{{ user.sender_name[:25] }}</h6>
+                                        <div class="row text-center">
+                                            <div class="col-4">
+                                                <div class="stat-number text-primary">{{ user.emoji_usage.emoji_frequency_percent }}%</div>
+                                                <div class="stat-label">Эмодзи</div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="stat-number text-success">{{ user.text_smilies_usage.smilies_frequency_percent }}%</div>
+                                                <div class="stat-label">Смайлы</div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="stat-number text-warning">{{ user.gif_sticker_usage.gif_frequency_percent }}%</div>
+                                                <div class="stat-label">Гифки</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-star"></i> Популярные эмодзи
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for emoji in emoji_analysis.global_stats.most_used_emojis[:10] %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="emoji-large">{{ emoji.emoji }}</span>
+                            <span class="badge bg-primary">{{ emoji.count }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-emoji-smile fs-1 text-muted"></i>
+            <p class="text-muted mt-2">Нет данных об эмодзи</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Анализ времени -->
+    <div class="tab-pane fade" id="time" role="tabpanel">
+        <div class="row">
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clock"></i> Активность по часам
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="chatHourlyChart" height="250"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-calendar-week"></i> По дням недели
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="chatWeeklyChart" height="250"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Данные для графиков
+const chatTimeData = {{ report.time_analysis | tojson if report.time_analysis else 'null' }};
+const startersData = {{ starters | tojson if starters else 'null' }};
+
+// График инициаторов диалогов
+if (startersData && startersData.conversation_starters) {
+    const startersCtx = document.getElementById('startersChart');
+    if (startersCtx) {
+        new Chart(startersCtx.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: startersData.conversation_starters.slice(0, 6).map(s => s.sender_name),
+                datasets: [{
+                    data: startersData.conversation_starters.slice(0, 6).map(s => s.percentage),
+                    backgroundColor: [
+                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                        '#9966FF', '#FF9F40'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+}
+
+// Графики времени активности для конкретного чата
+if (chatTimeData) {
+    // График по часам
+    if (chatTimeData.by_hour) {
+        const hourlyCtx = document.getElementById('chatHourlyChart');
+        if (hourlyCtx) {
+            new Chart(hourlyCtx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: chatTimeData.by_hour.map(h => h.hour + ':00'),
+                    datasets: [{
+                        label: 'Сообщений',
+                        data: chatTimeData.by_hour.map(h => h.count),
+                        borderColor: 'rgba(13, 110, 253, 1)',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+    }
+    
+    // График по дням недели
+    if (chatTimeData.by_weekday) {
+        const weeklyCtx = document.getElementById('chatWeeklyChart');
+        if (weeklyCtx) {
+            new Chart(weeklyCtx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: chatTimeData.by_weekday.map(d => d.weekday),
+                    datasets: [{
+                        label: 'Сообщений',
+                        data: chatTimeData.by_weekday.map(d => d.count),
+                        backgroundColor: 'rgba(13, 110, 253, 0.8)',
+                        borderColor: 'rgba(13, 110, 253, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+    }
+}
+
+// Функция поиска в чате
+function searchInChat(chatId) {
+    window.location.href = `/search?chat_id=${chatId}`;
+}
+
+// График общей активности чата (заглушка)
+const activityCtx = document.getElementById('chatActivityChart');
+if (activityCtx) {
+    // Создаем примерный график активности
+    const days = Array.from({length: 30}, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (29 - i));
+        return date.toLocaleDateString('ru-RU', { month: 'short', day: 'numeric' });
+    });
+    
+    new Chart(activityCtx.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: days,
+            datasets: [{
+                label: 'Сообщений',
+                data: Array.from({length: 30}, () => Math.floor(Math.random() * 50) + 5),
+                borderColor: 'rgba(13, 110, 253, 1)',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

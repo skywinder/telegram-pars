@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}Экспорт - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-download"></i> Экспорт данных
+        </h1>
+        <p class="lead text-muted">
+            Создавайте файлы, оптимизированные для анализа с помощью ИИ (ChatGPT, Claude) или для других целей.
+        </p>
+    </div>
+</div>
+
+<!-- Типы экспорта -->
+<div class="row mb-4">
+    <div class="col-lg-4 col-md-6 mb-3">
+        <div class="export-option h-100" data-export-type="overview">
+            <i class="bi bi-speedometer2 fs-1 text-primary mb-3"></i>
+            <h5>Общий обзор</h5>
+            <p class="text-muted">
+                Сводка по всем чатам, активности и темам. Идеально для первого знакомства с данными.
+            </p>
+            <button class="btn btn-primary" data-export-type="overview">
+                <i class="bi bi-download"></i> Создать обзор
+            </button>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 col-md-6 mb-3">
+        <div class="export-option h-100" data-export-type="topics">
+            <i class="bi bi-tags fs-1 text-success mb-3"></i>
+            <h5>Анализ тем</h5>
+            <p class="text-muted">
+                Частотность слов и ключевые темы разговоров. Помогает понять основные интересы.
+            </p>
+            <button class="btn btn-success" data-export-type="topics">
+                <i class="bi bi-download"></i> Создать анализ тем
+            </button>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 col-md-6 mb-3">
+        <div class="export-option h-100" data-export-type="package">
+            <i class="bi bi-archive fs-1 text-warning mb-3"></i>
+            <h5>Полный пакет</h5>
+            <p class="text-muted">
+                Комплексный набор файлов для глубокого анализа, включая руководство для ИИ.
+            </p>
+            <button class="btn btn-warning" data-export-type="package">
+                <i class="bi bi-download"></i> Создать полный пакет
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Экспорт для конкретного чата -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-chat-left-text"></i> Экспорт конкретного чата
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="chatSelect" class="form-label">Выберите чат:</label>
+                        <select class="form-select" id="chatSelect">
+                            <option value="">Загрузка чатов...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="exportDays" class="form-label">Период (дней):</label>
+                        <select class="form-select" id="exportDays">
+                            <option value="7">Последние 7 дней</option>
+                            <option value="30">Последние 30 дней</option>
+                            <option value="90">Последние 3 месяца</option>
+                            <option value="">Все время</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <div class="btn-group">
+                                <button class="btn btn-outline-primary" onclick="exportChat('chat')">
+                                    <i class="bi bi-robot"></i> AI анализ
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="exportChat('conversation')">
+                                    <i class="bi bi-chat-quote"></i> Диалог
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Результаты экспорта -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-file-earmark-check"></i> Результаты экспорта
+                </h5>
+            </div>
+            <div class="card-body" id="exportResults">
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-folder2-open fs-1"></i>
+                    <p class="mt-2">Создайте экспорт чтобы увидеть результаты</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Справка по использованию с ИИ -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-lightbulb"></i> Как использовать с ИИ
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-primary">📊 Для ChatGPT/Claude:</h6>
+                        <ol class="small">
+                            <li>Создайте "Общий обзор" или "Полный пакет"</li>
+                            <li>Скачайте JSON файл из папки <code>parsed_data/ai_ready/</code></li>
+                            <li>Загрузите файл в чат с ИИ</li>
+                            <li>Спросите: <em>"Проанализируй мой стиль общения в Telegram"</em></li>
+                        </ol>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-success">💡 Примеры вопросов для ИИ:</h6>
+                        <ul class="small">
+                            <li>"Какие основные темы я обсуждаю?"</li>
+                            <li>"Как различается мой стиль в разных чатах?"</li>
+                            <li>"В какое время я наиболее активен?"</li>
+                            <li>"Кто чаще начинает диалоги?"</li>
+                            <li>"Какие эмоции преобладают в моих сообщениях?"</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mt-3">
+                    <i class="bi bi-shield-check"></i>
+                    <strong>Конфиденциальность:</strong> 
+                    Перед загрузкой в ИИ проверьте файлы на наличие личной информации. 
+                    Для конфиденциальных данных используйте локальные ИИ модели.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Загрузка списка чатов
+document.addEventListener('DOMContentLoaded', function() {
+    loadChatsList();
+});
+
+async function loadChatsList() {
+    try {
+        // Имитируем загрузку чатов (в реальности нужно добавить API эндпоинт)
+        const chatSelect = document.getElementById('chatSelect');
+        chatSelect.innerHTML = `
+            <option value="">Выберите чат...</option>
+            <option value="123">Личный чат с Петей</option>
+            <option value="456">Группа "Друзья"</option>
+            <option value="789">Канал "Новости"</option>
+        `;
+    } catch (error) {
+        console.error('Ошибка загрузки чатов:', error);
+        document.getElementById('chatSelect').innerHTML = '<option value="">Ошибка загрузки</option>';
+    }
+}
+
+function exportChat(type) {
+    const chatId = document.getElementById('chatSelect').value;
+    const days = document.getElementById('exportDays').value;
+    
+    if (!chatId) {
+        showNotification('error', 'Выберите чат для экспорта');
+        return;
+    }
+    
+    // Вызываем функцию экспорта из app.js
+    performExport(type, chatId, days);
+}
+
+// Обработчики для кнопок быстрого экспорта
+document.querySelectorAll('.export-option button').forEach(button => {
+    button.addEventListener('click', function() {
+        const exportType = this.dataset.exportType;
+        performExport(exportType);
+    });
+});
+
+// Визуальная обратная связь для карточек экспорта
+document.querySelectorAll('.export-option').forEach(option => {
+    option.addEventListener('click', function() {
+        // Убираем выделение с других карточек
+        document.querySelectorAll('.export-option').forEach(o => o.classList.remove('selected'));
+        // Выделяем текущую
+        this.classList.add('selected');
+    });
+});
+
+// Переопределяем функцию displayExportFiles для этой страницы
+window.displayExportFiles = function(files) {
+    const exportResults = document.getElementById('exportResults');
+    
+    let html = '<div class="row">';
+    
+    Object.entries(files).forEach(([type, path], index) => {
+        const filename = path.split('/').pop();
+        const icon = getFileIcon(type);
+        const description = getFileDescription(type);
+        
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card border-success">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <i class="bi ${icon} fs-2 text-success me-3"></i>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title mb-1">${type.charAt(0).toUpperCase() + type.slice(1)}</h6>
+                                <p class="card-text small text-muted mb-1">${description}</p>
+                                <code class="small">${filename}</code>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-outline-primary" onclick="copyPath('${path}')">
+                                <i class="bi bi-clipboard"></i> Копировать путь
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    exportResults.innerHTML = html;
+};
+
+function getFileIcon(type) {
+    const icons = {
+        'overview': 'bi-speedometer2',
+        'topics': 'bi-tags',
+        'chat': 'bi-chat-left-text',
+        'conversation': 'bi-chat-quote',
+        'guide': 'bi-book'
+    };
+    return icons[type] || 'bi-file-earmark';
+}
+
+function getFileDescription(type) {
+    const descriptions = {
+        'overview': 'Общий обзор всех чатов и активности',
+        'topics': 'Анализ тем и частотности слов',
+        'chat': 'Детальный анализ конкретного чата',
+        'conversation': 'Читаемый фрагмент диалога',
+        'guide': 'Руководство по анализу для ИИ'
+    };
+    return descriptions[type] || 'Экспортированные данные';
+}
+
+function copyPath(path) {
+    navigator.clipboard.writeText(path).then(() => {
+        showNotification('success', 'Путь скопирован в буфер обмена');
+    }).catch(() => {
+        showNotification('error', 'Не удалось скопировать путь');
+    });
+}
+
+function showNotification(type, message) {
+    // Используем функцию из app.js
+    if (window.showNotification) {
+        window.showNotification(type, message);
+    } else {
+        alert(message);
+    }
+}
+</script>
+{% endblock %}

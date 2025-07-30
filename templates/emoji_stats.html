@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Статистика эмодзи - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-emoji-smile"></i> Статистика эмодзи и выражений
+        </h1>
+        <p class="lead text-muted">
+            Анализ использования эмодзи, текстовых смайликов и стикеров в ваших чатах.
+        </p>
+    </div>
+</div>
+
+{% if emoji_analysis %}
+<!-- Общая статистика -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-primary text-white">
+            <div class="card-body">
+                <i class="bi bi-emoji-heart-eyes fs-1 mb-2"></i>
+                <h4>{{ "{:,}".format(emoji_analysis.global_stats.total_unique_emojis) }}</h4>
+                <small>Уникальных эмодзи</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <i class="bi bi-chat-heart fs-1 mb-2"></i>
+                <h4>{{ "{:,}".format(emoji_analysis.global_stats.total_messages_analyzed) }}</h4>
+                <small>Сообщений проанализировано</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-info text-white">
+            <div class="card-body">
+                <i class="bi bi-emoji-laughing fs-1 mb-2"></i>
+                <h4>{{ emoji_analysis.global_stats.most_used_emojis[:5] | sum(attribute='count') }}</h4>
+                <small>Топ-5 эмодзи</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-warning text-white">
+            <div class="card-body">
+                <i class="bi bi-emoji-wink fs-1 mb-2"></i>
+                <h4>{{ emoji_analysis.global_stats.most_used_text_smilies | length }}</h4>
+                <small>Текстовых смайликов</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Популярные эмодзи -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-star"></i> Самые популярные эмодзи
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for emoji in emoji_analysis.global_stats.most_used_emojis[:20] %}
+                    <div class="col-6 mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <span class="emoji-large me-3">{{ emoji.emoji }}</span>
+                                <span>{{ loop.index }}</span>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-primary">{{ emoji.count }}</span>
+                                <div class="progress mt-1" style="width: 60px; height: 8px;">
+                                    <div class="progress-bar" 
+                                         style="width: {{ (emoji.count / emoji_analysis.global_stats.most_used_emojis[0].count * 100) if emoji_analysis.global_stats.most_used_emojis else 0 }}%">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- График эмодзи -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-pie-chart"></i> Топ-10 эмодзи
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="emojiChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Текстовые смайлики -->
+{% if emoji_analysis.global_stats.most_used_text_smilies %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-emoji-sunglasses"></i> Популярные текстовые смайлики
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for smiley in emoji_analysis.global_stats.most_used_text_smilies %}
+                    <div class="col-lg-2 col-md-3 col-sm-4 col-6 mb-3">
+                        <div class="text-center">
+                            <div class="fs-2 font-monospace">{{ smiley.smiley }}</div>
+                            <span class="badge bg-secondary">{{ smiley.count }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Статистика по пользователям -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-people"></i> Статистика по пользователям
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if emoji_analysis.user_expression_stats %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Пользователь</th>
+                                <th>Всего сообщений</th>
+                                <th>Эмодзи %</th>
+                                <th>Ср. эмодзи</th>
+                                <th>Текстовые %</th>
+                                <th>Гифки/Стикеры %</th>
+                                <th>Уникальных эмодзи</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in emoji_analysis.user_expression_stats[:15] %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2" 
+                                             style="width: 32px; height: 32px; font-size: 14px;">
+                                            {{ user.sender_name[0].upper() if user.sender_name else 'U' }}
+                                        </div>
+                                        <span>{{ user.sender_name[:20] }}{% if user.sender_name|length > 20 %}...{% endif %}</span>
+                                    </div>
+                                </td>
+                                <td>{{ "{:,}".format(user.total_messages) }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">{{ user.emoji_usage.emoji_frequency_percent }}%</span>
+                                        <div class="progress flex-grow-1" style="height: 8px; width: 60px;">
+                                            <div class="progress-bar bg-primary" 
+                                                 style="width: {{ user.emoji_usage.emoji_frequency_percent }}%">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ user.emoji_usage.avg_emoji_per_message }}</td>
+                                <td>
+                                    <span class="badge bg-success">{{ user.text_smilies_usage.smilies_frequency_percent }}%</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-warning">{{ user.gif_sticker_usage.gif_frequency_percent }}%</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ user.emoji_usage.unique_emojis_count }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-emoji-neutral fs-1 text-muted"></i>
+                    <p class="text-muted mt-2">Нет данных о пользователях</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- Нет данных -->
+<div class="row">
+    <div class="col-12">
+        <div class="text-center py-5">
+            <i class="bi bi-emoji-frown display-1 text-muted"></i>
+            <h3 class="mt-4 text-muted">Нет данных об эмодзи</h3>
+            <p class="text-muted">Выполните парсинг чатов, чтобы увидеть статистику эмодзи</p>
+            <a href="{{ url_for('index') }}" class="btn btn-primary">
+                <i class="bi bi-arrow-left"></i> На главную
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if emoji_analysis %}
+<script>
+// График эмодзи
+const emojiData = {{ emoji_analysis.global_stats.most_used_emojis[:10] | tojson }};
+
+if (emojiData && emojiData.length > 0) {
+    const ctx = document.getElementById('emojiChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: emojiData.map(item => item.emoji + ' (' + item.count + ')'),
+            datasets: [{
+                data: emojiData.map(item => item.count),
+                backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                    '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#36A2EB'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        font: {
+                            size: 11
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return label + ' - ' + percentage + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Анимация появления карточек
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.card');
+    cards.forEach((card, index) => {
+        setTimeout(() => {
+            card.classList.add('fade-in');
+        }, index * 50);
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

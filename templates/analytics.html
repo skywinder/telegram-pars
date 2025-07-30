@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+
+{% block title %}Аналитика - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-graph-up"></i> Аналитика
+        </h1>
+    </div>
+</div>
+
+<!-- Вкладки аналитики -->
+<ul class="nav nav-tabs mb-4" id="analyticsTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button">
+            <i class="bi bi-speedometer2"></i> Обзор
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="time-tab" data-bs-toggle="tab" data-bs-target="#time" type="button">
+            <i class="bi bi-clock"></i> Время
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="topics-tab" data-bs-toggle="tab" data-bs-target="#topics" type="button">
+            <i class="bi bi-tags"></i> Темы
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="changes-tab" data-bs-toggle="tab" data-bs-target="#changes" type="button">
+            <i class="bi bi-pencil-square"></i> Изменения
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="analyticsTabContent">
+    <!-- Обзор -->
+    <div class="tab-pane fade show active" id="overview" role="tabpanel">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h4>Самые активные чаты</h4>
+            </div>
+        </div>
+        
+        <div class="row">
+            {% if active_chats %}
+                {% for chat in active_chats %}
+                <div class="col-lg-4 col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="card-title">
+                                        {{ chat.chat_name[:25] }}{% if chat.chat_name|length > 25 %}...{% endif %}
+                                    </h6>
+                                    <p class="card-text">
+                                        <small class="text-muted">{{ chat.chat_type }}</small>
+                                    </p>
+                                    <div class="d-flex justify-content-between">
+                                        <small>
+                                            <i class="bi bi-envelope"></i> 
+                                            {{ "{:,}".format(chat.message_count) }}
+                                        </small>
+                                        <small>
+                                            <i class="bi bi-people"></i> 
+                                            {{ chat.unique_users }}
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-primary">
+                                        {{ chat.active_days }} дн.
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="progress mt-2" style="height: 5px;">
+                                <div class="progress-bar" style="width: {{ (chat.message_count / active_chats[0].message_count * 100) if active_chats else 0 }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="col-12 text-center py-5">
+                    <i class="bi bi-inbox fs-1 text-muted"></i>
+                    <p class="text-muted mt-2">Нет данных для отображения</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Анализ времени -->
+    <div class="tab-pane fade" id="time" role="tabpanel">
+        {% if time_analysis %}
+        <div class="row">
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clock"></i> Активность по часам
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="hourlyChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-calendar-week"></i> Активность по дням недели
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="weeklyChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Инсайты -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-lightbulb"></i> Инсайты активности
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="timeInsights">
+                            <!-- Заполняется через JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-clock fs-1 text-muted"></i>
+            <p class="text-muted mt-2">Нет данных о времени активности</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Анализ тем -->
+    <div class="tab-pane fade" id="topics" role="tabpanel">
+        {% if topics %}
+        <div class="row">
+            <div class="col-lg-8 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-tags"></i> Топ слов
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for word in topics.top_words[:20] %}
+                            <div class="col-lg-6 mb-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>{{ word.word }}</span>
+                                    <div>
+                                        <span class="badge bg-primary me-2">{{ word.count }}</span>
+                                        <div class="progress d-inline-block" style="width: 100px; height: 8px;">
+                                            <div class="progress-bar" style="width: {{ (word.count / topics.top_words[0].count * 100) if topics.top_words else 0 }}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-pie-chart"></i> Статистика слов
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center">
+                            <canvas id="topicsChart" width="200" height="200"></canvas>
+                        </div>
+                        <hr>
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <div class="stat-number">{{ "{:,}".format(topics.total_messages_analyzed) }}</div>
+                                <div class="stat-label">Сообщений</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="stat-number">{{ "{:,}".format(topics.unique_words) }}</div>
+                                <div class="stat-label">Уникальных слов</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-tags fs-1 text-muted"></i>
+            <p class="text-muted mt-2">Нет данных для анализа тем</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- История изменений -->
+    <div class="tab-pane fade" id="changes" role="tabpanel">
+        {% if changes %}
+        <div class="row mb-4">
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-graph-up"></i> Типы изменений
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="changesChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-chat-dots"></i> Активные чаты
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if changes.most_active_chats %}
+                            {% for chat in changes.most_active_chats[:8] %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-truncate" style="max-width: 200px;">
+                                    {{ chat.chat_name }}
+                                </span>
+                                <div>
+                                    <span class="badge bg-warning me-1">{{ chat.edits }}</span>
+                                    <span class="badge bg-danger">{{ chat.deletions }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center">Нет данных об активности</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Детальная статистика изменений -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-list-check"></i> Общая статистика изменений
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for change_type in changes.changes_summary %}
+                            <div class="col-md-4 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        {% if change_type.action_type == 'created' %}
+                                            <i class="bi bi-plus-circle fs-1 text-success"></i>
+                                            <h5 class="mt-2">Создано</h5>
+                                        {% elif change_type.action_type == 'edited' %}
+                                            <i class="bi bi-pencil fs-1 text-warning"></i>
+                                            <h5 class="mt-2">Отредактировано</h5>
+                                        {% elif change_type.action_type == 'deleted' %}
+                                            <i class="bi bi-trash fs-1 text-danger"></i>
+                                            <h5 class="mt-2">Удалено</h5>
+                                        {% endif %}
+                                        <h3 class="text-primary">{{ change_type.count }}</h3>
+                                        <small class="text-muted">
+                                            В {{ change_type.affected_chats }} чатах
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-pencil-square fs-1 text-muted"></i>
+            <p class="text-muted mt-2">Нет данных об изменениях</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Данные для графиков
+const timeAnalysisData = {{ time_analysis | tojson if time_analysis else 'null' }};
+const topicsData = {{ topics | tojson if topics else 'null' }};
+const changesData = {{ changes | tojson if changes else 'null' }};
+
+// График активности по часам
+if (timeAnalysisData && timeAnalysisData.by_hour) {
+    const hourlyCtx = document.getElementById('hourlyChart').getContext('2d');
+    new Chart(hourlyCtx, {
+        type: 'line',
+        data: {
+            labels: timeAnalysisData.by_hour.map(h => h.hour + ':00'),
+            datasets: [{
+                label: 'Сообщений',
+                data: timeAnalysisData.by_hour.map(h => h.count),
+                borderColor: 'rgba(13, 110, 253, 1)',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+    
+    // Инсайты активности
+    generateTimeInsights(timeAnalysisData);
+}
+
+// График активности по дням недели
+if (timeAnalysisData && timeAnalysisData.by_weekday) {
+    const weeklyCtx = document.getElementById('weeklyChart').getContext('2d');
+    new Chart(weeklyCtx, {
+        type: 'bar',
+        data: {
+            labels: timeAnalysisData.by_weekday.map(d => d.weekday),
+            datasets: [{
+                label: 'Сообщений',
+                data: timeAnalysisData.by_weekday.map(d => d.count),
+                backgroundColor: 'rgba(13, 110, 253, 0.8)',
+                borderColor: 'rgba(13, 110, 253, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+}
+
+// График тем (топ слова)
+if (topicsData && topicsData.top_words) {
+    const topicsCtx = document.getElementById('topicsChart').getContext('2d');
+    new Chart(topicsCtx, {
+        type: 'doughnut',
+        data: {
+            labels: topicsData.top_words.slice(0, 8).map(w => w.word),
+            datasets: [{
+                data: topicsData.top_words.slice(0, 8).map(w => w.count),
+                backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                    '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        fontSize: 10
+                    }
+                }
+            }
+        }
+    });
+}
+
+// График изменений
+if (changesData && changesData.changes_summary) {
+    const changesCtx = document.getElementById('changesChart').getContext('2d');
+    new Chart(changesCtx, {
+        type: 'pie',
+        data: {
+            labels: changesData.changes_summary.map(c => {
+                switch(c.action_type) {
+                    case 'created': return 'Создано';
+                    case 'edited': return 'Отредактировано';
+                    case 'deleted': return 'Удалено';
+                    default: return c.action_type;
+                }
+            }),
+            datasets: [{
+                data: changesData.changes_summary.map(c => c.count),
+                backgroundColor: ['#28a745', '#ffc107', '#dc3545']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function generateTimeInsights(data) {
+    const insights = document.getElementById('timeInsights');
+    if (!data.by_hour) return;
+    
+    // Находим пик активности
+    const peakHour = data.by_hour.reduce((max, hour) => 
+        hour.count > max.count ? hour : max, data.by_hour[0]
+    );
+    
+    // Находим самый тихий час
+    const quietHour = data.by_hour.reduce((min, hour) => 
+        hour.count < min.count ? hour : min, data.by_hour[0]
+    );
+    
+    // Определяем тип активности
+    const morningActivity = data.by_hour.filter(h => h.hour >= 6 && h.hour < 12)
+        .reduce((sum, h) => sum + h.count, 0);
+    const eveningActivity = data.by_hour.filter(h => h.hour >= 18 && h.hour < 24)
+        .reduce((sum, h) => sum + h.count, 0);
+    
+    const activityType = morningActivity > eveningActivity ? 'утренний' : 'вечерний';
+    
+    insights.innerHTML = `
+        <div class="col-md-4">
+            <div class="text-center">
+                <i class="bi bi-sun fs-2 text-warning"></i>
+                <h6 class="mt-2">Пик активности</h6>
+                <p class="text-muted">${peakHour.hour}:00 (${peakHour.count} сообщений)</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="text-center">
+                <i class="bi bi-moon fs-2 text-info"></i>
+                <h6 class="mt-2">Тихий час</h6>
+                <p class="text-muted">${quietHour.hour}:00 (${quietHour.count} сообщений)</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="text-center">
+                <i class="bi bi-person-check fs-2 text-success"></i>
+                <h6 class="mt-2">Тип активности</h6>
+                <p class="text-muted">Вы ${activityType} человек</p>
+            </div>
+        </div>
+    `;
+}
+
+// Сохранение данных в глобальных переменных для использования в app.js
+window.timeAnalysisData = timeAnalysisData;
+window.emojiData = topicsData;
+</script>
+{% endblock %}
