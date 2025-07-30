@@ -46,4 +46,24 @@ wheels/
 .Spotlight-V100
 .Trashes
 ehthumbs.db
-Thumbs.db
+Thumbs.db# Generated data - should not be committed
+parsed_data/
+*.db
+*.log
+__pycache__/
+*.pyc
+*.pyo
+.env
+telegram_parser_session.session
+
+# Virtual environments
+telegram_env/
+venv/
+env/
+.venv/
+bin/
+include/
+lib/
+lib64/
+share/
+pyvenv.cfg
