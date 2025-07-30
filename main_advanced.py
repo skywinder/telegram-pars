@@ -250,11 +250,13 @@ async def show_analytics_menu(analytics: TelegramAnalytics, ai_exporter: AIExpor
         print("2. ⏰ Анализ активности по времени")
         print("3. 🏷️ Анализ тем разговоров")
         print("4. 👥 Статистика пользователей")
-        print("5. 📊 Полный отчет по чату")
-        print("6. ← Назад в главное меню")
+        print("5. 💬 Кто начинает диалоги")
+        print("6. 😀 Анализ эмодзи и смайликов")
+        print("7. 📊 Полный отчет по чату")
+        print("8. ← Назад в главное меню")
         print("="*40)
         
-        choice = input("\n👉 Выбери (1-6): ").strip()
+        choice = input("\n👉 Выбери (1-8): ").strip()
         
         if choice == "1":
             await show_active_chats(analytics)
@@ -265,8 +267,12 @@ async def show_analytics_menu(analytics: TelegramAnalytics, ai_exporter: AIExpor
         elif choice == "4":
             await show_users_stats(analytics)
         elif choice == "5":
-            await show_chat_report(analytics)
+            await show_conversation_starters(analytics)
         elif choice == "6":
+            await show_emoji_analysis(analytics)
+        elif choice == "7":
+            await show_chat_report(analytics)
+        elif choice == "8":
             break
         else:
             print("❌ Неверный выбор")
@@ -353,6 +359,84 @@ async def show_users_stats(analytics: TelegramAnalytics):
         name = user['full_name'].strip() or user['username'] or f"User_{user['user_id']}"
         name = name[:18] + '..' if len(name) > 20 else name
         print(f"{i:>2}. {name:20} {user['message_count']:>10} {user['avg_message_length'] or 0:>10.1f}")
+    
+    input("\nНажми Enter...")
+
+async def show_conversation_starters(analytics: TelegramAnalytics):
+    """Показывает кто чаще начинает диалоги"""
+    print("\n💬 АНАЛИЗ ИНИЦИАЦИИ ДИАЛОГОВ:")
+    
+    chat_id = input("ID чата (Enter для всех чатов): ").strip()
+    if chat_id:
+        try:
+            chat_id = int(chat_id)
+        except ValueError:
+            print("❌ Неверный ID чата")
+            return
+    else:
+        chat_id = None
+    
+    analysis = analytics.analyze_conversation_starters(chat_id)
+    
+    if 'error' in analysis:
+        print(f"❌ {analysis['error']}")
+        return
+    
+    print(f"\n📊 Всего диалогов проанализировано: {analysis['total_conversations']}")
+    print(f"⏰ Средний промежуток между диалогами: {analysis['average_gap_hours']} часов")
+    
+    print(f"\n🏁 КТО ЧАЩЕ НАЧИНАЕТ ДИАЛОГИ:")
+    print("-" * 60)
+    
+    for i, starter in enumerate(analysis['conversation_starters'], 1):
+        name = starter['sender_name'][:25] + '...' if len(starter['sender_name']) > 28 else starter['sender_name']
+        print(f"{i:>2}. {name:30} {starter['percentage']:>5.1f}% ({starter['conversations_started']} раз)")
+    
+    input("\nНажми Enter...")
+
+async def show_emoji_analysis(analytics: TelegramAnalytics):
+    """Показывает анализ эмодзи и смайликов"""
+    print("\n😀 АНАЛИЗ ЭМОДЗИ И СМАЙЛИКОВ:")
+    
+    chat_id = input("ID чата (Enter для всех чатов): ").strip()
+    if chat_id:
+        try:
+            chat_id = int(chat_id)
+        except ValueError:
+            print("❌ Неверный ID чата")
+            return
+    else:
+        chat_id = None
+    
+    analysis = analytics.analyze_emoji_and_expressions(chat_id)
+    
+    print(f"\n📊 ОБЩАЯ СТАТИСТИКА:")
+    global_stats = analysis['global_stats']
+    print(f"📝 Сообщений проанализировано: {global_stats['total_messages_analyzed']}")
+    print(f"😀 Уникальных эмодзи найдено: {global_stats['total_unique_emojis']}")
+    
+    print(f"\n🔥 САМЫЕ ПОПУЛЯРНЫЕ ЭМОДЗИ:")
+    for i, emoji_data in enumerate(global_stats['most_used_emojis'][:10], 1):
+        print(f"{i:>2}. {emoji_data['emoji']} - {emoji_data['count']} раз")
+    
+    if global_stats['most_used_text_smilies']:
+        print(f"\n😄 ПОПУЛЯРНЫЕ ТЕКСТОВЫЕ СМАЙЛИКИ:")
+        for i, smiley_data in enumerate(global_stats['most_used_text_smilies'][:5], 1):
+            print(f"{i:>2}. {smiley_data['smiley']} - {smiley_data['count']} раз")
+    
+    print(f"\n👥 СТАТИСТИКА ПО ПОЛЬЗОВАТЕЛЯМ:")
+    print("-" * 80)
+    print(f"{'Имя':20} {'Эмодзи %':>8} {'Смайлы %':>8} {'Гифки %':>8} {'Ср.эмодзи':>10}")
+    print("-" * 80)
+    
+    for user in analysis['user_expression_stats'][:10]:
+        name = user['sender_name'][:18] + '..' if len(user['sender_name']) > 20 else user['sender_name']
+        emoji_pct = user['emoji_usage']['emoji_frequency_percent']
+        smiley_pct = user['text_smilies_usage']['smilies_frequency_percent']
+        gif_pct = user['gif_sticker_usage']['gif_frequency_percent']
+        avg_emoji = user['emoji_usage']['avg_emoji_per_message']
+        
+        print(f"{name:20} {emoji_pct:>7.1f}% {smiley_pct:>7.1f}% {gif_pct:>7.1f}% {avg_emoji:>9.2f}")
     
     input("\nНажми Enter...")
 

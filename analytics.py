@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import json
 from collections import Counter, defaultdict
 import re
+import emoji
 
 class TelegramAnalytics:
     """
@@ -307,4 +308,201 @@ class TelegramAnalytics:
                     "Есть ли повторяющиеся паттерны в общении?",
                     "Какие выводы можно сделать о характере участников?"
                 ]
+            }
+    
+    def analyze_conversation_starters(self, chat_id: int = None) -> Dict:
+        """
+        Анализирует кто чаще всего начинает диалоги
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            chat_filter = f"AND m.chat_id = {chat_id}" if chat_id else ""
+            
+            # Получаем сообщения отсортированные по времени
+            messages = conn.execute(f'''
+                SELECT 
+                    m.sender_id,
+                    m.date,
+                    m.text,
+                    COALESCE(u.first_name, u.username, 'User_' || u.id) as sender_name
+                FROM messages m
+                LEFT JOIN users u ON m.sender_id = u.id
+                WHERE m.is_deleted = FALSE 
+                AND m.text IS NOT NULL 
+                AND LENGTH(m.text) > 0 {chat_filter}
+                ORDER BY m.date ASC
+            ''').fetchall()
+            
+            if not messages:
+                return {'error': 'Нет сообщений для анализа'}
+            
+            # Анализируем инициацию диалогов
+            conversation_starters = Counter()
+            last_sender = None
+            conversation_gaps = []  # Промежутки между сообщениями
+            
+            for i, msg in enumerate(messages):
+                current_time = datetime.fromisoformat(msg['date'])
+                
+                # Если это первое сообщение или прошло много времени с последнего
+                if i == 0:
+                    conversation_starters[msg['sender_id']] += 1
+                    last_sender = msg['sender_id']
+                    continue
+                
+                prev_time = datetime.fromisoformat(messages[i-1]['date'])
+                time_gap = (current_time - prev_time).total_seconds() / 3600  # в часах
+                
+                # Если прошло больше 2 часов - считаем новым диалогом
+                if time_gap > 2 or msg['sender_id'] != last_sender:
+                    conversation_starters[msg['sender_id']] += 1
+                
+                last_sender = msg['sender_id']
+                conversation_gaps.append(time_gap)
+            
+            # Статистика по пользователям
+            total_conversations = sum(conversation_starters.values())
+            starter_stats = []
+            
+            for sender_id, count in conversation_starters.most_common():
+                sender_name = next((msg['sender_name'] for msg in messages if msg['sender_id'] == sender_id), f'User_{sender_id}')
+                percentage = (count / total_conversations) * 100
+                starter_stats.append({
+                    'sender_id': sender_id,
+                    'sender_name': sender_name,
+                    'conversations_started': count,
+                    'percentage': round(percentage, 1)
+                })
+            
+            return {
+                'total_conversations': total_conversations,
+                'conversation_starters': starter_stats,
+                'average_gap_hours': round(sum(conversation_gaps) / len(conversation_gaps), 2) if conversation_gaps else 0,
+                'analysis_period': {
+                    'from': messages[0]['date'] if messages else None,
+                    'to': messages[-1]['date'] if messages else None,
+                    'total_messages': len(messages)
+                }
+            }
+    
+    def analyze_emoji_and_expressions(self, chat_id: int = None) -> Dict:
+        """
+        Анализирует использование эмодзи, гифок и текстовых смайликов
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            chat_filter = f"AND m.chat_id = {chat_id}" if chat_id else ""
+            
+            # Получаем сообщения с текстом
+            messages = conn.execute(f'''
+                SELECT 
+                    m.sender_id,
+                    m.text,
+                    m.media_type,
+                    COALESCE(u.first_name, u.username, 'User_' || u.id) as sender_name
+                FROM messages m
+                LEFT JOIN users u ON m.sender_id = u.id
+                WHERE m.is_deleted = FALSE 
+                AND m.text IS NOT NULL {chat_filter}
+            ''').fetchall()
+            
+            # Паттерны для текстовых смайликов
+            text_smilies = [
+                r':\)', r':\(', r':D', r':P', r':p', r';\)', r':\|',
+                r'=\)', r'=\(', r'=D', r'=P', r'=p', r';\(',
+                r'xD', r'XD', r':o', r':O', r':\*', r'<3',
+                r'\)\)', r'\(\(', r':\/', r':\\', r':\|',
+                r':-\)', r':-\(', r':-D', r':-P', r':-p', r';\-\)',
+                r':-\|', r':-o', r':-O', r':\-\*'
+            ]
+            
+            # Статистика по пользователям
+            user_stats = defaultdict(lambda: {
+                'total_messages': 0,
+                'emoji_count': 0,
+                'emoji_messages': 0,
+                'text_smilies_count': 0,
+                'text_smilies_messages': 0,
+                'gif_sticker_messages': 0,
+                'unique_emojis': set(),
+                'sender_name': ''
+            })
+            
+            all_emojis = Counter()
+            all_text_smilies = Counter()
+            
+            for msg in messages:
+                sender_id = msg['sender_id']
+                text = msg['text'] or ''
+                media_type = msg['media_type'] or ''
+                
+                user_stats[sender_id]['total_messages'] += 1
+                user_stats[sender_id]['sender_name'] = msg['sender_name']
+                
+                # Анализ эмодзи
+                emojis_in_msg = [char for char in text if char in emoji.EMOJI_DATA]
+                if emojis_in_msg:
+                    user_stats[sender_id]['emoji_messages'] += 1
+                    user_stats[sender_id]['emoji_count'] += len(emojis_in_msg)
+                    user_stats[sender_id]['unique_emojis'].update(emojis_in_msg)
+                    all_emojis.update(emojis_in_msg)
+                
+                # Анализ текстовых смайликов
+                text_smilies_found = []
+                for smiley_pattern in text_smilies:
+                    matches = re.findall(smiley_pattern, text)
+                    text_smilies_found.extend(matches)
+                
+                if text_smilies_found:
+                    user_stats[sender_id]['text_smilies_messages'] += 1
+                    user_stats[sender_id]['text_smilies_count'] += len(text_smilies_found)
+                    all_text_smilies.update(text_smilies_found)
+                
+                # Анализ гифок и стикеров
+                if 'gif' in media_type.lower() or 'sticker' in media_type.lower():
+                    user_stats[sender_id]['gif_sticker_messages'] += 1
+            
+            # Преобразуем в удобный формат
+            result_stats = []
+            for sender_id, stats in user_stats.items():
+                if stats['total_messages'] > 0:
+                    emoji_freq = (stats['emoji_messages'] / stats['total_messages']) * 100
+                    text_smiley_freq = (stats['text_smilies_messages'] / stats['total_messages']) * 100
+                    gif_freq = (stats['gif_sticker_messages'] / stats['total_messages']) * 100
+                    
+                    result_stats.append({
+                        'sender_id': sender_id,
+                        'sender_name': stats['sender_name'],
+                        'total_messages': stats['total_messages'],
+                        'emoji_usage': {
+                            'messages_with_emoji': stats['emoji_messages'],
+                            'total_emoji_count': stats['emoji_count'],
+                            'emoji_frequency_percent': round(emoji_freq, 1),
+                            'unique_emojis_count': len(stats['unique_emojis']),
+                            'avg_emoji_per_message': round(stats['emoji_count'] / stats['total_messages'], 2)
+                        },
+                        'text_smilies_usage': {
+                            'messages_with_smilies': stats['text_smilies_messages'],
+                            'total_smilies_count': stats['text_smilies_count'],
+                            'smilies_frequency_percent': round(text_smiley_freq, 1)
+                        },
+                        'gif_sticker_usage': {
+                            'gif_sticker_messages': stats['gif_sticker_messages'],
+                            'gif_frequency_percent': round(gif_freq, 1)
+                        }
+                    })
+            
+            # Сортируем по общей частоте использования эмодзи
+            result_stats.sort(key=lambda x: x['emoji_usage']['emoji_frequency_percent'], reverse=True)
+            
+            return {
+                'user_expression_stats': result_stats,
+                'global_stats': {
+                    'most_used_emojis': [{'emoji': e, 'count': c} for e, c in all_emojis.most_common(20)],
+                    'most_used_text_smilies': [{'smiley': s, 'count': c} for s, c in all_text_smilies.most_common(10)],
+                    'total_unique_emojis': len(all_emojis),
+                    'total_messages_analyzed': sum(stats['total_messages'] for stats in user_stats.values())
+                }
             }
