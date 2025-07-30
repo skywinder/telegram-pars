@@ -331,3 +331,81 @@ class TelegramDatabase:
             ))
         
         print(f"✅ Сессия {session_id} завершена")
+    
+    def get_last_message_date(self, chat_id: int) -> Optional[str]:
+        """Получает дату последнего сообщения в чате"""
+        with sqlite3.connect(self.db_path) as conn:
+            result = conn.execute('''
+                SELECT MAX(date) FROM messages 
+                WHERE chat_id = ? AND is_deleted = FALSE
+            ''', (chat_id,)).fetchone()
+            
+            return result[0] if result and result[0] else None
+    
+    def get_cached_message_count(self, chat_id: int) -> int:
+        """Получает количество кэшированных сообщений в чате"""
+        with sqlite3.connect(self.db_path) as conn:
+            result = conn.execute('''
+                SELECT COUNT(*) FROM messages 
+                WHERE chat_id = ? AND is_deleted = FALSE
+            ''', (chat_id,)).fetchone()
+            
+            return result[0] if result else 0
+    
+    def should_check_for_changes(self, chat_id: int, hours_threshold: int = 24) -> bool:
+        """Определяет, нужно ли проверять изменения в чате"""
+        with sqlite3.connect(self.db_path) as conn:
+            result = conn.execute('''
+                SELECT MAX(timestamp) FROM message_history 
+                WHERE chat_id = ? AND action_type IN ('created', 'edited', 'deleted')
+            ''', (chat_id,)).fetchone()
+            
+            if not result or not result[0]:
+                return True
+                
+            from datetime import datetime, timedelta
+            last_check = datetime.fromisoformat(result[0])
+            threshold = datetime.now() - timedelta(hours=hours_threshold)
+            
+            return last_check < threshold
+    
+    def get_parsing_statistics(self) -> Dict:
+        """Получает статистику парсинга для мониторинга"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            # Общая статистика
+            total_stats = conn.execute('''
+                SELECT 
+                    COUNT(DISTINCT chat_id) as total_chats,
+                    COUNT(*) as total_messages,
+                    COUNT(CASE WHEN is_deleted = TRUE THEN 1 END) as deleted_messages
+                FROM messages
+            ''').fetchone()
+            
+            # Статистика по последним сессиям
+            recent_sessions = conn.execute('''
+                SELECT 
+                    id, start_time, end_time, total_chats, total_messages, changes_detected
+                FROM scan_sessions 
+                ORDER BY start_time DESC 
+                LIMIT 5
+            ''').fetchall()
+            
+            # Активность по изменениям за последние дни
+            recent_changes = conn.execute('''
+                SELECT 
+                    action_type,
+                    COUNT(*) as count,
+                    DATE(timestamp) as date
+                FROM message_history 
+                WHERE timestamp > datetime('now', '-7 days')
+                GROUP BY action_type, DATE(timestamp)
+                ORDER BY date DESC, action_type
+            ''').fetchall()
+            
+            return {
+                'total_statistics': dict(total_stats) if total_stats else {},
+                'recent_sessions': [dict(row) for row in recent_sessions],
+                'recent_changes': [dict(row) for row in recent_changes]
+            }

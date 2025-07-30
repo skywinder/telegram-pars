@@ -13,8 +13,17 @@ API_HASH = os.getenv('TELEGRAM_API_HASH')
 PHONE_NUMBER = os.getenv('PHONE_NUMBER')
 
 # Настройки парсинга
-MAX_MESSAGES = 1000  # Максимальное количество сообщений для парсинга
+MAX_MESSAGES = None  # None = парсить все доступные сообщения
 OUTPUT_DIR = "parsed_data"  # Папка для сохранения результатов
+
+# Настройки безопасности и ограничений
+RATE_LIMITING = {
+    'delay_between_chats': 2,  # Задержка между чатами (секунды)
+    'delay_between_requests': 0.5,  # Задержка между запросами (секунды)
+    'max_flood_wait': 300,  # Максимальное время ожидания FloodWait (5 минут)
+    'backoff_multiplier': 1.5,  # Множитель для экспоненциального отката
+    'check_account_restrictions': True  # Проверять ограничения аккаунта
+}
 
 # Настройки базы данных
 DB_FILENAME = "telegram_history.db"  # Имя файла базы данных
