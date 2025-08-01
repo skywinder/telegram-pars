@@ -10,7 +10,7 @@ from data_exporter import DataExporter
 from analytics import TelegramAnalytics
 from ai_exporter import AIExporter
 from database import TelegramDatabase
-from web_interface import set_active_parser, clear_active_parser
+from status_manager import set_active_parser, clear_active_parser
 import config
 
 async def main():
@@ -80,7 +80,7 @@ async def main():
 
             elif choice == "7":
                 # Статистика базы данных
-                await show_database_stats(analytics)
+                await show_database_stats(parser.db)
 
             elif choice == "8":
                 # Настройки
@@ -574,13 +574,13 @@ async def show_changes_history(analytics: TelegramAnalytics):
 
 async def show_database_stats(analytics: TelegramAnalytics):
     """Показывает статистику базы данных"""
-    if not analytics:
+    if not analytics or not analytics.db:
         print("❌ БД недоступна")
         return
 
     print("\n🗄️ СТАТИСТИКА БАЗЫ ДАННЫХ:")
 
-    stats = analytics.get_chat_statistics()
+    stats = analytics.db.get_chat_statistics()
 
     if not stats:
         print("📭 Нет данных в базе")

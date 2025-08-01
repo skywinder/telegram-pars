@@ -10,6 +10,7 @@ from flask import Flask, render_template, request, jsonify, send_file, redirect,
 from analytics import TelegramAnalytics
 from ai_exporter import AIExporter
 from database import TelegramDatabase
+from status_manager import StatusManager
 import config
 
 # Создаем Flask приложение
@@ -278,18 +279,29 @@ def status_page():
 @app.route('/api/status')
 def api_get_status():
     """API для получения текущего статуса парсинга"""
-    if not active_parser:
+    # Читаем статус из файла вместо прямого обращения к парсеру
+    status_data = StatusManager.get_status()
+    
+    if not status_data:
         return jsonify({
             'status': 'no_active_parser',
             'message': 'Нет активного парсера'
         })
 
     try:
-        status = active_parser.get_current_status()
-        return jsonify({
-            'status': 'success',
-            'data': status
-        })
+        # Если есть активный парсер в этом процессе, получаем детальный статус
+        if active_parser and hasattr(active_parser, 'get_current_status'):
+            detailed_status = active_parser.get_current_status()
+            return jsonify({
+                'status': 'success',
+                'data': detailed_status
+            })
+        else:
+            # Иначе возвращаем статус из файла
+            return jsonify({
+                'status': 'success',
+                'data': status_data
+            })
     except Exception as e:
         return jsonify({
             'status': 'error',
@@ -299,14 +311,22 @@ def api_get_status():
 @app.route('/api/status/interrupt', methods=['POST'])
 def api_request_interrupt():
     """API для запроса прерывания парсинга"""
-    if not active_parser:
+    # Используем StatusManager для запроса прерывания
+    status_data = StatusManager.get_status()
+    
+    if not status_data:
         return jsonify({
             'status': 'error',
             'message': 'Нет активного парсера для прерывания'
         }), 400
 
     try:
-        active_parser.request_interruption()
+        StatusManager.request_interruption()
+        
+        # Если есть активный парсер в этом процессе, вызываем его метод
+        if active_parser and hasattr(active_parser, 'request_interruption'):
+            active_parser.request_interruption()
+            
         return jsonify({
             'status': 'success',
             'message': 'Запрошено изящное прерывание операции'
