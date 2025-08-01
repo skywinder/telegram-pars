@@ -731,6 +731,123 @@ def api_get_chat_messages_with_changes(chat_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/parsing')
+def parsing_page():
+    """Страница управления парсингом"""
+    return render_template('parsing.html')
+
+@app.route('/api/start-parsing', methods=['POST'])
+def api_start_parsing():
+    """API для запуска парсинга"""
+    import subprocess
+    import threading
+    
+    try:
+        data = request.get_json()
+        parsing_type = data.get('type', 'all')  # all, single, check_changes
+        chat_id = data.get('chat_id')
+        options = data.get('options', {})
+        
+        # Формируем команду для запуска
+        cmd = ['python', 'main.py']
+        
+        # Добавляем параметры в зависимости от типа
+        if parsing_type == 'single' and chat_id:
+            # Для одного чата нужно будет модифицировать main.py
+            cmd.extend(['--chat', str(chat_id)])
+        elif parsing_type == 'check_changes':
+            cmd.extend(['--check-changes'])
+        elif parsing_type == 'all':
+            cmd.extend(['--all'])
+            
+        # Добавляем опции
+        if options.get('force_full_scan'):
+            cmd.append('--force-full-scan')
+        if options.get('limit'):
+            cmd.extend(['--limit', str(options['limit'])])
+            
+        # Запускаем процесс в фоне
+        def run_parsing():
+            try:
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                # Сохраняем PID для возможности остановки
+                with open('parsing.pid', 'w') as f:
+                    f.write(str(process.pid))
+            except Exception as e:
+                print(f"Ошибка запуска парсинга: {e}")
+        
+        thread = threading.Thread(target=run_parsing)
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Парсинг запущен',
+            'type': parsing_type
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/stop-parsing', methods=['POST'])
+def api_stop_parsing():
+    """API для остановки парсинга"""
+    try:
+        # Используем StatusManager для запроса прерывания
+        StatusManager.request_interruption()
+        
+        # Также пытаемся остановить процесс если есть PID
+        import signal
+        try:
+            with open('parsing.pid', 'r') as f:
+                pid = int(f.read())
+                os.kill(pid, signal.SIGINT)
+        except:
+            pass
+            
+        return jsonify({
+            'success': True,
+            'message': 'Запрошена остановка парсинга'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/parsing-options')
+def api_get_parsing_options():
+    """API для получения доступных опций парсинга"""
+    try:
+        # Получаем список чатов если БД доступна
+        chats = []
+        if analytics:
+            raw_chats = analytics.get_most_active_chats(limit=1000)
+            chats = [{'id': chat['chat_id'], 'name': chat['chat_name']} for chat in raw_chats]
+            
+        return jsonify({
+            'success': True,
+            'chats': chats,
+            'options': {
+                'force_full_scan': {
+                    'label': 'Полное сканирование (игнорировать кэш)',
+                    'description': 'Перепроверить все сообщения, включая старые',
+                    'default': False
+                },
+                'limit': {
+                    'label': 'Лимит сообщений',
+                    'description': 'Максимальное количество сообщений для парсинга',
+                    'default': None,
+                    'type': 'number'
+                },
+                'check_changes_hours': {
+                    'label': 'Проверка изменений за N часов',
+                    'description': 'При проверке изменений смотреть за последние N часов',
+                    'default': 24,
+                    'type': 'number'
+                }
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 def set_active_parser(parser):
     """Устанавливает активный парсер для мониторинга"""
     global active_parser

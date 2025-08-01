@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+
+{% block title %}Управление парсингом - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="bi bi-play-circle"></i> Управление парсингом
+        </h2>
+
+        <!-- Статус парсинга -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-activity"></i> Текущий статус</h5>
+            </div>
+            <div class="card-body">
+                <div id="parsing-status">
+                    <div class="text-center text-muted">
+                        <i class="bi bi-hourglass-split"></i> Загрузка статуса...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Опции парсинга -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-gear"></i> Запуск парсинга</h5>
+            </div>
+            <div class="card-body">
+                <!-- Тип парсинга -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Тип парсинга:</label>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="form-check card p-3">
+                                <input class="form-check-input" type="radio" name="parsingType" id="parseAll" value="all" checked>
+                                <label class="form-check-label" for="parseAll">
+                                    <strong>Все чаты</strong>
+                                    <br><small class="text-muted">Парсинг всех доступных чатов</small>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="form-check card p-3">
+                                <input class="form-check-input" type="radio" name="parsingType" id="parseSingle" value="single">
+                                <label class="form-check-label" for="parseSingle">
+                                    <strong>Один чат</strong>
+                                    <br><small class="text-muted">Парсинг выбранного чата</small>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="form-check card p-3">
+                                <input class="form-check-input" type="radio" name="parsingType" id="checkChanges" value="check_changes">
+                                <label class="form-check-label" for="checkChanges">
+                                    <strong>Проверка изменений</strong>
+                                    <br><small class="text-muted">Поиск отредактированных и удаленных сообщений</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Выбор чата (для single mode) -->
+                <div class="mb-3" id="chatSelectDiv" style="display: none;">
+                    <label for="chatSelect" class="form-label">Выберите чат:</label>
+                    <select class="form-select" id="chatSelect">
+                        <option value="">Загрузка списка чатов...</option>
+                    </select>
+                </div>
+
+                <!-- Дополнительные опции -->
+                <div class="mb-4">
+                    <h6 class="mb-3">Дополнительные опции:</h6>
+                    
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="forceFullScan">
+                        <label class="form-check-label" for="forceFullScan">
+                            <strong>Полное сканирование</strong>
+                            <small class="text-muted">(игнорировать кэш, перепроверить все сообщения)</small>
+                        </label>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="messageLimit" class="form-label">Лимит сообщений:</label>
+                            <input type="number" class="form-control" id="messageLimit" placeholder="Без ограничений">
+                            <small class="text-muted">Оставьте пустым для парсинга всех сообщений</small>
+                        </div>
+                        <div class="col-md-6" id="changeHoursDiv" style="display: none;">
+                            <label for="changeHours" class="form-label">Проверка изменений за N часов:</label>
+                            <input type="number" class="form-control" id="changeHours" value="24" min="1">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Кнопки управления -->
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" id="startParsingBtn" onclick="startParsing()">
+                        <i class="bi bi-play-fill"></i> Запустить парсинг
+                    </button>
+                    <button class="btn btn-danger" id="stopParsingBtn" onclick="stopParsing()" style="display: none;">
+                        <i class="bi bi-stop-fill"></i> Остановить парсинг
+                    </button>
+                    <a href="/status" class="btn btn-info">
+                        <i class="bi bi-graph-up"></i> Мониторинг статуса
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Последние результаты -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> История запусков</h5>
+            </div>
+            <div class="card-body">
+                <div id="parsing-history">
+                    <p class="text-muted">История парсинга будет отображаться здесь...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Переменные состояния
+let isParsingActive = false;
+let statusInterval = null;
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    loadParsingOptions();
+    checkCurrentStatus();
+    
+    // Обработчики изменения типа парсинга
+    document.querySelectorAll('input[name="parsingType"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            updateUIForParsingType(this.value);
+        });
+    });
+});
+
+// Обновление UI в зависимости от типа парсинга
+function updateUIForParsingType(type) {
+    document.getElementById('chatSelectDiv').style.display = (type === 'single') ? 'block' : 'none';
+    document.getElementById('changeHoursDiv').style.display = (type === 'check_changes') ? 'block' : 'none';
+}
+
+// Загрузка опций парсинга
+function loadParsingOptions() {
+    fetch('/api/parsing-options')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.chats) {
+                const select = document.getElementById('chatSelect');
+                select.innerHTML = '<option value="">Выберите чат...</option>';
+                data.chats.forEach(chat => {
+                    const option = document.createElement('option');
+                    option.value = chat.id;
+                    option.textContent = chat.name;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('Ошибка загрузки опций:', error));
+}
+
+// Проверка текущего статуса
+function checkCurrentStatus() {
+    fetch('/api/status')
+        .then(response => response.json())
+        .then(data => {
+            updateStatusDisplay(data);
+            
+            // Если парсинг активен, запускаем мониторинг
+            if (data.data && data.data.is_active) {
+                isParsingActive = true;
+                startStatusMonitoring();
+                updateButtons(true);
+            } else {
+                updateButtons(false);
+            }
+        })
+        .catch(error => console.error('Ошибка проверки статуса:', error));
+}
+
+// Обновление отображения статуса
+function updateStatusDisplay(data) {
+    const statusDiv = document.getElementById('parsing-status');
+    
+    if (!data || data.status === 'no_active_parser') {
+        statusDiv.innerHTML = `
+            <div class="alert alert-info mb-0">
+                <i class="bi bi-info-circle"></i> Парсинг не активен
+            </div>
+        `;
+        return;
+    }
+    
+    if (data.data && data.data.is_active) {
+        const status = data.data;
+        const progress = status.progress || {};
+        
+        let progressHtml = '';
+        if (progress.total_chats > 0) {
+            const percent = (progress.processed_chats / progress.total_chats * 100).toFixed(1);
+            progressHtml = `
+                <div class="progress mb-3" style="height: 25px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: ${percent}%">
+                        ${percent}% (${progress.processed_chats}/${progress.total_chats} чатов)
+                    </div>
+                </div>
+            `;
+        }
+        
+        statusDiv.innerHTML = `
+            <div class="alert alert-success">
+                <h6><i class="bi bi-activity"></i> Парсинг активен</h6>
+                <p class="mb-2"><strong>Операция:</strong> ${status.current_operation || 'Неизвестно'}</p>
+                ${status.current_chat ? `<p class="mb-2"><strong>Текущий чат:</strong> ${status.current_chat.name || status.current_chat}</p>` : ''}
+                ${progressHtml}
+                ${progress.parsing_phase ? `<p class="mb-0"><small class="text-muted">${progress.parsing_phase}</small></p>` : ''}
+            </div>
+        `;
+    } else {
+        statusDiv.innerHTML = `
+            <div class="alert alert-warning mb-0">
+                <i class="bi bi-pause-circle"></i> Парсинг завершен или приостановлен
+            </div>
+        `;
+    }
+}
+
+// Запуск парсинга
+function startParsing() {
+    const type = document.querySelector('input[name="parsingType"]:checked').value;
+    const options = {
+        force_full_scan: document.getElementById('forceFullScan').checked,
+        limit: document.getElementById('messageLimit').value || null
+    };
+    
+    let requestData = {
+        type: type,
+        options: options
+    };
+    
+    // Добавляем специфичные параметры
+    if (type === 'single') {
+        const chatId = document.getElementById('chatSelect').value;
+        if (!chatId) {
+            alert('Выберите чат для парсинга');
+            return;
+        }
+        requestData.chat_id = chatId;
+    } else if (type === 'check_changes') {
+        options.check_changes_hours = document.getElementById('changeHours').value || 24;
+    }
+    
+    // Блокируем кнопку
+    const btn = document.getElementById('startParsingBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Запуск...';
+    
+    fetch('/api/start-parsing', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Парсинг запущен! Используйте мониторинг статуса для отслеживания прогресса.');
+            isParsingActive = true;
+            startStatusMonitoring();
+            updateButtons(true);
+        } else {
+            alert('Ошибка запуска парсинга: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка:', error);
+        alert('Ошибка запуска парсинга: ' + error.message);
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-play-fill"></i> Запустить парсинг';
+    });
+}
+
+// Остановка парсинга
+function stopParsing() {
+    if (confirm('Вы уверены, что хотите остановить парсинг?')) {
+        fetch('/api/stop-parsing', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Запрошена остановка парсинга');
+                // Статус обновится автоматически через мониторинг
+            } else {
+                alert('Ошибка остановки парсинга: ' + (data.error || 'Неизвестная ошибка'));
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка:', error);
+            alert('Ошибка остановки парсинга: ' + error.message);
+        });
+    }
+}
+
+// Запуск мониторинга статуса
+function startStatusMonitoring() {
+    if (statusInterval) return;
+    
+    statusInterval = setInterval(() => {
+        checkCurrentStatus();
+    }, 2000); // Обновляем каждые 2 секунды
+}
+
+// Остановка мониторинга
+function stopStatusMonitoring() {
+    if (statusInterval) {
+        clearInterval(statusInterval);
+        statusInterval = null;
+    }
+}
+
+// Обновление кнопок
+function updateButtons(isActive) {
+    document.getElementById('startParsingBtn').style.display = isActive ? 'none' : 'inline-block';
+    document.getElementById('stopParsingBtn').style.display = isActive ? 'inline-block' : 'none';
+    
+    if (!isActive) {
+        stopStatusMonitoring();
+    }
+}
+
+// Останавливаем мониторинг при уходе со страницы
+window.addEventListener('beforeunload', function() {
+    stopStatusMonitoring();
+});
+</script>
+{% endblock %}
