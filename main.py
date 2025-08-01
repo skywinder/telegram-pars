@@ -216,15 +216,19 @@ async def parse_single_chat(parser: TelegramParser, exporter: DataExporter):
                     ai_files = ai_exp.create_complete_ai_package(selected_chat['id'])
                     print("✅ AI анализ создан автоматически!")
 
-            except KeyboardInterrupt:
+            except (KeyboardInterrupt, asyncio.CancelledError):
                 print("\n\n⏹️ Остановка парсинга...")
                 parser.request_interruption()
 
                 # Ждем завершения
                 try:
                     await asyncio.wait_for(monitor_task, timeout=5.0)
-                except asyncio.TimeoutError:
+                except (asyncio.TimeoutError, asyncio.CancelledError):
                     monitor_task.cancel()
+                    try:
+                        await monitor_task
+                    except asyncio.CancelledError:
+                        pass
 
                 # Показываем финальную статистику
                 final_status = parser.get_current_status()
@@ -301,15 +305,19 @@ async def parse_all_chats(parser: TelegramParser, exporter: DataExporter):
             ai_files = ai_exp.create_complete_ai_package()
             print("✅ AI анализ создан автоматически!")
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, asyncio.CancelledError):
         print("\n\n⏹️ Остановка парсинга...")
         parser.request_interruption()
 
         # Ждем завершения
         try:
             await asyncio.wait_for(monitor_task, timeout=5.0)
-        except asyncio.TimeoutError:
+        except (asyncio.TimeoutError, asyncio.CancelledError):
             monitor_task.cancel()
+            try:
+                await monitor_task
+            except asyncio.CancelledError:
+                pass
 
         # Показываем финальную статистику
         final_status = parser.get_current_status()
@@ -786,10 +794,13 @@ async def monitor_parsing_status(parser: TelegramParser):
 
                     # Перемещаемся назад и очищаем старый вывод
                     if lines_printed > 0:
-                        print(f"\033[{lines_printed}A\033[J", end='')  # Перемещаемся вверх и очищаем
+                        # Используем более точное перемещение курсора
+                        print(f"\033[{lines_printed}A", end='')  # Перемещаемся вверх
+                        print("\033[0J", end='')  # Очищаем от курсора до конца экрана
                     
                     # Компактный вывод статуса
-                    print(f"📊 {operation}: {chat_name[:50]}...")
+                    chat_short = chat_name[:40] + '...' if len(chat_name) > 40 else chat_name
+                    print(f"📊 {operation}: {chat_short}")
                     
                     # Фаза парсинга
                     parsing_phase = status['progress'].get('parsing_phase', '')
@@ -849,14 +860,21 @@ async def monitor_parsing_status(parser: TelegramParser):
                     print(f"\n💡 Для остановки нажмите Ctrl+C")
                     
                     # Считаем количество напечатанных строк (более точный подсчет)
-                    lines_printed = 8  # Базовые строки
+                    lines_printed = 2  # Заголовок + фаза
+                    
                     if status['progress']['total_chats'] > 0:
-                        lines_printed += 2  # Прогресс по чатам
+                        lines_printed += 5  # Заголовок + прогресс-бар + обработано
+                    
                     if 'current_chat_messages_processed' in status['progress']:
-                        lines_printed += 2  # Прогресс по сообщениям
+                        lines_printed += 2  # Заголовок + сообщения
                         if status['progress'].get('new_messages_found', 0) > 0:
                             lines_printed += 1  # Новые сообщения
-                    lines_printed += 3  # Время и статистика
+                    
+                    lines_printed += 2  # Время
+                    if api_stats and api_stats['total_requests'] > 0:
+                        lines_printed += 1  # API статистика
+                    
+                    lines_printed += 2  # Пустая строка + подсказка Ctrl+C
 
                 last_status = status
                 last_chat_id = current_chat_id
@@ -971,5 +989,9 @@ if __name__ == "__main__":
     print("🐍 Python версия OK")
     print("📦 Запускаем парсер с полным функционалом...")
 
-    # Запускаем основную программу
-    asyncio.run(main())
+    # Запускаем основную программу с обработкой прерывания
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n\n✋ Программа остановлена пользователем")
+        sys.exit(0)

@@ -38,7 +38,7 @@ EXPORT_FORMATS = {
 }
 
 # Настройки автоматизации
-AUTO_CREATE_AI_ANALYSIS = True  # Автоматически создавать AI анализ после парсинга
+AUTO_CREATE_AI_ANALYSIS = False  # Автоматически создавать AI анализ после парсинга (отключено)
 
 # Настройки аналитики
 ANALYTICS_SETTINGS = {
