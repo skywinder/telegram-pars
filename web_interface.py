@@ -20,11 +20,12 @@ app.secret_key = 'telegram_parser_secret_key_2024'  # Для flash сообще�
 analytics = None
 ai_exporter = None
 db = None
+active_parser = None  # Ссылка на активный парсер для мониторинга статуса
 
 def init_app():
     """Инициализация приложения"""
     global analytics, ai_exporter, db
-    
+
     # Проверяем есть ли база данных
     db_path = os.path.join(config.OUTPUT_DIR, config.DB_FILENAME)
     if os.path.exists(db_path):
@@ -46,19 +47,19 @@ def index():
     """Главная страница"""
     if not analytics:
         return render_template('no_data.html')
-    
+
     try:
         # Получаем базовую статистику
         stats = analytics.get_chat_statistics()[:10]  # Топ 10 чатов
-        
+
         # Общая статистика
         total_chats = len(analytics.get_chat_statistics())
         total_messages = sum(s['total_messages'] for s in analytics.get_chat_statistics())
-        
+
         # Последние изменения
         changes_summary = analytics.get_changes_summary(days=7)
-        
-        return render_template('dashboard.html', 
+
+        return render_template('dashboard.html',
                              stats=stats,
                              total_chats=total_chats,
                              total_messages=total_messages,
@@ -72,7 +73,7 @@ def chats():
     """Страница со списком чатов"""
     if not analytics:
         return redirect(url_for('index'))
-    
+
     try:
         chats_data = analytics.get_chat_statistics()
         return render_template('chats.html', chats=chats_data)
@@ -85,22 +86,22 @@ def chat_detail(chat_id):
     """Детальная информация о чате"""
     if not analytics:
         return redirect(url_for('index'))
-    
+
     try:
         # Получаем подробную информацию
         report = analytics.generate_chat_report(chat_id)
-        
+
         if 'error' in report:
             flash(f"Чат не найден: {report['error']}", 'error')
             return redirect(url_for('chats'))
-        
+
         # Анализ стартеров диалогов
         starters = analytics.analyze_conversation_starters(chat_id)
-        
+
         # Анализ эмодзи
         emoji_analysis = analytics.analyze_emoji_and_expressions(chat_id)
-        
-        return render_template('chat_detail.html', 
+
+        return render_template('chat_detail.html',
                              report=report,
                              starters=starters,
                              emoji_analysis=emoji_analysis,
@@ -114,20 +115,20 @@ def analytics_page():
     """Страница аналитики"""
     if not analytics:
         return redirect(url_for('index'))
-    
+
     try:
         # Активные чаты
         active_chats = analytics.get_most_active_chats(limit=15)
-        
+
         # Анализ времени
         time_analysis = analytics.get_activity_by_time()
-        
+
         # Топ темы
         topics = analytics.analyze_conversation_topics()
-        
+
         # Изменения
         changes = analytics.get_message_changes_analytics()
-        
+
         return render_template('analytics.html',
                              active_chats=active_chats,
                              time_analysis=time_analysis,
@@ -142,7 +143,7 @@ def emoji_stats():
     """Страница статистики эмодзи"""
     if not analytics:
         return redirect(url_for('index'))
-    
+
     try:
         emoji_analysis = analytics.analyze_emoji_and_expressions()
         return render_template('emoji_stats.html', emoji_analysis=emoji_analysis)
@@ -155,7 +156,7 @@ def conversation_starters():
     """Страница анализа инициаторов диалогов"""
     if not analytics:
         return redirect(url_for('index'))
-    
+
     try:
         starters = analytics.analyze_conversation_starters()
         return render_template('conversation_starters.html', starters=starters)
@@ -173,10 +174,10 @@ def api_export(export_type):
     """API для экспорта данных"""
     if not ai_exporter:
         return jsonify({'error': 'AI Exporter недоступен'}), 500
-    
+
     try:
         chat_id = request.args.get('chat_id', type=int)
-        
+
         if export_type == 'overview':
             filename = ai_exporter.create_overview_file()
         elif export_type == 'topics':
@@ -191,9 +192,9 @@ def api_export(export_type):
             return jsonify({'success': True, 'files': files})
         else:
             return jsonify({'error': 'Неверный тип экспорта'}), 400
-        
+
         return jsonify({'success': True, 'filename': os.path.basename(filename)})
-    
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -202,23 +203,23 @@ def api_chat_stats(chat_id):
     """API для получения статистики чата"""
     if not analytics:
         return jsonify({'error': 'Analytics недоступен'}), 500
-    
+
     try:
         # Базовая статистика
         stats = analytics.get_chat_statistics()
         chat_stats = next((s for s in stats if s['id'] == chat_id), None)
-        
+
         if not chat_stats:
             return jsonify({'error': 'Чат не найден'}), 404
-        
+
         # Анализ времени для этого чата
         time_data = analytics.get_activity_by_time(chat_id)
-        
+
         return jsonify({
             'basic_stats': chat_stats,
             'time_analysis': time_data
         })
-    
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -227,40 +228,40 @@ def api_search():
     """API для поиска по сообщениям"""
     if not db:
         return jsonify({'error': 'База данных недоступна'}), 500
-    
+
     query = request.args.get('q', '').strip()
     chat_id = request.args.get('chat_id', type=int)
     limit = request.args.get('limit', 20, type=int)
-    
+
     if not query or len(query) < 3:
         return jsonify({'error': 'Запрос должен содержать минимум 3 символа'}), 400
-    
+
     try:
         with sqlite3.connect(db.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            
+
             chat_filter = f"AND m.chat_id = {chat_id}" if chat_id else ""
-            
+
             results = conn.execute(f'''
-                SELECT 
+                SELECT
                     m.id, m.text, m.date, m.chat_id,
                     c.name as chat_name,
                     COALESCE(u.first_name, u.username, 'User_' || u.id) as sender_name
                 FROM messages m
                 LEFT JOIN chats c ON m.chat_id = c.id
                 LEFT JOIN users u ON m.sender_id = u.id
-                WHERE m.text LIKE ? 
+                WHERE m.text LIKE ?
                 AND m.is_deleted = FALSE {chat_filter}
                 ORDER BY m.date DESC
                 LIMIT ?
             ''', (f'%{query}%', limit)).fetchall()
-            
+
             return jsonify({
                 'results': [dict(row) for row in results],
                 'total': len(results),
                 'query': query
             })
-    
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -268,6 +269,58 @@ def api_search():
 def search_page():
     """Страница поиска"""
     return render_template('search.html')
+
+@app.route('/api/status')
+def api_get_status():
+    """API для получения текущего статуса парсинга"""
+    if not active_parser:
+        return jsonify({
+            'status': 'no_active_parser',
+            'message': 'Нет активного парсера'
+        })
+
+    try:
+        status = active_parser.get_current_status()
+        return jsonify({
+            'status': 'success',
+            'data': status
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/status/interrupt', methods=['POST'])
+def api_request_interrupt():
+    """API для запроса прерывания парсинга"""
+    if not active_parser:
+        return jsonify({
+            'status': 'error',
+            'message': 'Нет активного парсера для прерывания'
+        }), 400
+
+    try:
+        active_parser.request_interruption()
+        return jsonify({
+            'status': 'success',
+            'message': 'Запрошено изящное прерывание операции'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+def set_active_parser(parser):
+    """Устанавливает активный парсер для мониторинга"""
+    global active_parser
+    active_parser = parser
+
+def clear_active_parser():
+    """Очищает ссылку на активный парсер"""
+    global active_parser
+    active_parser = None
 
 @app.errorhandler(404)
 def not_found(error):
@@ -281,18 +334,18 @@ def internal_error(error):
 
 if __name__ == '__main__':
     print("🌐 Запуск веб-интерфейса Telegram Parser...")
-    
+
     # Создаем папки если их нет
     os.makedirs('templates', exist_ok=True)
     os.makedirs('static/css', exist_ok=True)
     os.makedirs('static/js', exist_ok=True)
-    
+
     # Инициализируем приложение
     if init_app():
         print("✅ Приложение готово!")
         print("🌐 Открой в браузере: http://localhost:5000")
         print("⏹️  Для остановки нажми Ctrl+C")
-        
+
         # Запускаем в режиме разработки
         app.run(debug=True, host='0.0.0.0', port=5000)
     else:
