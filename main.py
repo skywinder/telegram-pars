@@ -183,10 +183,10 @@ async def parse_single_chat(parser: TelegramParser, exporter: DataExporter):
             try:
                 # Парсим чат
                 messages = await parser.parse_chat_messages(selected_chat['id'], limit, session_id)
-                
+
                 # Останавливаем мониторинг
                 monitor_task.cancel()
-                
+
                 print(f"\n✅ Парсинг завершен! Спарсено {len(messages)} сообщений")
 
                 # Создаем структуру данных для экспорта
@@ -216,13 +216,13 @@ async def parse_single_chat(parser: TelegramParser, exporter: DataExporter):
             except KeyboardInterrupt:
                 print("\n⏹️ Остановка парсинга...")
                 parser.request_interruption()
-                
+
                 # Ждем завершения
                 try:
                     await asyncio.wait_for(monitor_task, timeout=5.0)
                 except asyncio.TimeoutError:
                     monitor_task.cancel()
-                
+
                 print("✅ Парсинг остановлен. Данные сохранены.")
                 return
 
@@ -255,10 +255,10 @@ async def parse_all_chats(parser: TelegramParser, exporter: DataExporter):
     try:
         # Парсим все чаты
         all_data = await parser.parse_all_chats()
-        
+
         # Останавливаем мониторинг
         monitor_task.cancel()
-        
+
         print(f"\n✅ Парсинг всех чатов завершен!")
 
         # Экспортируем результаты
@@ -282,13 +282,13 @@ async def parse_all_chats(parser: TelegramParser, exporter: DataExporter):
     except KeyboardInterrupt:
         print("\n⏹️ Остановка парсинга...")
         parser.request_interruption()
-        
+
         # Ждем завершения
         try:
             await asyncio.wait_for(monitor_task, timeout=5.0)
         except asyncio.TimeoutError:
             monitor_task.cancel()
-        
+
         print("✅ Парсинг остановлен. Данные сохранены.")
         return
 
@@ -628,40 +628,84 @@ async def show_changes_history(analytics: TelegramAnalytics):
 async def monitor_parsing_status(parser: TelegramParser):
     """Мониторинг статуса парсинга в реальном времени"""
     last_status = None
-    
+    last_chat_id = None
+    start_time = datetime.now()
+
     while True:
         try:
             status = parser.get_current_status()
-            
-            # Показываем статус только если он изменился
-            if status != last_status:
+
+            # Показываем статус если он изменился или сменился чат
+            current_chat_id = status.get('current_chat_id')
+            if status != last_status or current_chat_id != last_chat_id:
                 if status['is_active']:
                     operation = status['current_operation'] or 'Парсинг'
                     chat_name = status['current_chat'] or 'Неизвестный чат'
+
+                    # Очищаем предыдущие строки для обновления прогресса
+                    print("\033[2K\r", end='')  # Очищаем текущую строку
                     
+                    # Основная информация
                     print(f"\n📊 {operation}: {chat_name}")
-                    
+
+                    # Прогресс по чатам
                     if status['progress']['total_chats'] > 0:
-                        progress = (status['progress']['processed_chats'] / status['progress']['total_chats']) * 100
-                        print(f"   Прогресс: {status['progress']['processed_chats']}/{status['progress']['total_chats']} чатов ({progress:.1f}%)")
+                        processed = status['progress']['processed_chats']
+                        total = status['progress']['total_chats']
+                        progress = (processed / total) * 100
+                        
+                        # Визуальный прогресс-бар
+                        bar_length = 30
+                        filled_length = int(bar_length * processed // total)
+                        bar = '█' * filled_length + '░' * (bar_length - filled_length)
+                        
+                        print(f"   📈 Прогресс: [{bar}] {progress:.1f}%")
+                        print(f"   📁 Обработано: {processed}/{total} чатов")
+
+                    # Прогресс по сообщениям в текущем чате
+                    if 'current_chat_messages' in status['progress']:
+                        msg_processed = status['progress'].get('current_chat_messages_processed', 0)
+                        msg_total = status['progress'].get('current_chat_messages', 0)
+                        if msg_total > 0:
+                            msg_progress = (msg_processed / msg_total) * 100
+                            print(f"   💬 Сообщения в чате: {msg_processed}/{msg_total} ({msg_progress:.1f}%)")
+
+                    # Время
+                    elapsed_time = datetime.now() - start_time
+                    print(f"   ⏱️ Прошло времени: {str(elapsed_time).split('.')[0]}")
                     
                     if status['progress']['estimated_time_remaining']:
-                        print(f"   ⏱️ Осталось примерно: {status['progress']['estimated_time_remaining']}")
-                    
-                    # Показываем статистику API
+                        print(f"   ⏳ Осталось примерно: {status['progress']['estimated_time_remaining']}")
+
+                    # Статистика API
                     api_stats = parser.get_session_statistics()
                     if api_stats:
-                        print(f"   📡 API запросов: {api_stats['total_requests']}, ошибок: {api_stats['errors']}")
-                
+                        print(f"   📡 API: {api_stats['total_requests']} запросов", end='')
+                        if api_stats['flood_waits'] > 0:
+                            print(f", {api_stats['flood_waits']} FloodWait", end='')
+                        if api_stats['errors'] > 0:
+                            print(f", {api_stats['errors']} ошибок", end='')
+                        print()
+
+                    # Скорость обработки
+                    if api_stats and api_stats['total_requests'] > 0 and elapsed_time.total_seconds() > 0:
+                        speed = api_stats['total_requests'] / elapsed_time.total_seconds()
+                        print(f"   ⚡ Скорость: {speed:.1f} запросов/сек")
+
+                    print(f"\n💡 Для остановки нажмите Ctrl+C")
+                    print("─" * 50)
+
                 last_status = status
-            
+                last_chat_id = current_chat_id
+
             # Проверяем запрос на прерывание
             if parser.check_interruption_requested():
                 print("\n🛑 Получен запрос на остановку...")
+                print("⏳ Завершаем обработку текущего чата...")
                 break
-            
-            await asyncio.sleep(2)  # Обновляем каждые 2 секунды
-            
+
+            await asyncio.sleep(1)  # Обновляем каждую секунду для лучшей отзывчивости
+
         except asyncio.CancelledError:
             break
         except Exception as e:
@@ -698,26 +742,26 @@ async def show_database_stats(db: TelegramDatabase):
 async def show_current_status(parser: TelegramParser):
     """Показывает текущий статус парсинга"""
     print("\n📊 ТЕКУЩИЙ СТАТУС ПАРСИНГА:")
-    
+
     status = parser.get_current_status()
-    
+
     if status['is_active']:
         print("🟢 Парсинг активен")
         print(f"📋 Операция: {status['current_operation'] or 'Неизвестно'}")
         print(f"💬 Текущий чат: {status['current_chat'] or 'Неизвестно'}")
-        
+
         if status['progress']['total_chats'] > 0:
             progress = (status['progress']['processed_chats'] / status['progress']['total_chats']) * 100
             print(f"📈 Прогресс: {status['progress']['processed_chats']}/{status['progress']['total_chats']} чатов ({progress:.1f}%)")
-        
+
         if status['progress']['estimated_time_remaining']:
             print(f"⏱️ Осталось примерно: {status['progress']['estimated_time_remaining']}")
-        
+
         if status['last_update']:
             print(f"🕐 Последнее обновление: {status['last_update']}")
     else:
         print("🔴 Парсинг не активен")
-    
+
     # Показываем статистику API
     api_stats = parser.get_session_statistics()
     if api_stats:
@@ -725,11 +769,11 @@ async def show_current_status(parser: TelegramParser):
         print(f"   Всего запросов: {api_stats['total_requests']}")
         print(f"   FloodWait ошибок: {api_stats['flood_waits']}")
         print(f"   Других ошибок: {api_stats['errors']}")
-        
+
         if api_stats['start_time']:
             duration = datetime.now() - api_stats['start_time']
             print(f"   Время работы: {duration}")
-    
+
     input("\nНажми Enter...")
 
 async def show_settings_menu():
