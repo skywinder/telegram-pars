@@ -13,6 +13,7 @@ from telethon.errors import FloodWaitError, AuthKeyUnregisteredError, UserRestri
 from telethon.tl.functions.account import GetAuthorizationsRequest
 from database import TelegramDatabase
 import config
+from realtime_monitor import RealtimeMonitor, set_monitor_instance
 
 class TelegramParser:
     """
@@ -24,6 +25,7 @@ class TelegramParser:
         self.client = None
         self.session_name = 'telegram_parser_session'
         self.db = None
+        self.monitor = None  # Экземпляр монитора изменений
         if config.ENABLE_HISTORY_TRACKING:
             db_path = os.path.join(config.OUTPUT_DIR, config.DB_FILENAME)
             self.db = TelegramDatabase(db_path)
@@ -78,6 +80,9 @@ class TelegramParser:
         # Проверяем ограничения аккаунта если включено
         if self.rate_limits.get('check_account_restrictions', True):
             await self._check_account_restrictions()
+        
+        # Инициализируем монитор изменений если включен
+        await self._init_realtime_monitor()
 
     async def _check_account_restrictions(self):
         """Проверяет ограничения аккаунта"""
@@ -104,6 +109,23 @@ class TelegramParser:
             self.account_restricted = True
         except Exception as e:
             print(f"⚠️ Ошибка при проверке аккаунта: {e}")
+    
+    async def _init_realtime_monitor(self):
+        """Инициализирует монитор изменений"""
+        if not self.db:
+            return
+            
+        try:
+            # Проверяем настройку в конфиге
+            if hasattr(config, 'ENABLE_REALTIME_MONITOR') and config.ENABLE_REALTIME_MONITOR:
+                print("🔍 Инициализация монитора изменений...")
+                self.monitor = RealtimeMonitor(self.client, self.db)
+                set_monitor_instance(self.monitor)
+                print("✅ Монитор изменений готов к работе")
+            else:
+                print("ℹ️ Монитор изменений отключен в настройках")
+        except Exception as e:
+            print(f"⚠️ Ошибка инициализации монитора: {e}")
 
     async def _safe_request(self, request, max_retries: int = 3):
         """Безопасное выполнение запроса с обработкой ограничений"""
@@ -704,6 +726,11 @@ class TelegramParser:
 
     async def close(self):
         """Закрываем соединение с выводом статистики"""
+        # Останавливаем монитор если он активен
+        if self.monitor and self.monitor.is_running:
+            self.monitor.stop_monitoring()
+            print("🛑 Остановлен монитор изменений")
+            
         if self.client:
             await self.client.disconnect()
             print("👋 Отключились от Telegram")
@@ -713,10 +740,25 @@ class TelegramParser:
         print(f"\n📊 Статистика сессии:")
         print(f"⏱️ Длительность: {stats['duration_seconds']:.1f}s")
         print(f"📡 Всего запросов: {stats['total_requests']}")
-        print(f"⚠️ FloodWait ошибок: {stats['flood_waits']}")
-        print(f"❌ Других ошибок: {stats['errors']}")
-        print(f"📈 Запросов в минуту: {stats['requests_per_minute']:.1f}")
-        print(f"🚫 Аккаунт ограничен: {'Да' if stats['account_restricted'] else 'Нет'}")
-
-        if stats['flood_wait_rate'] > 0:
-            print(f"⚡ Процент FloodWait: {stats['flood_wait_rate']:.1f}%")
+    
+    async def start_realtime_monitor(self, chat_ids: Optional[List[int]] = None):
+        """Запускает мониторинг изменений в реальном времени"""
+        if not self.monitor:
+            print("❌ Монитор не инициализирован. Включите ENABLE_REALTIME_MONITOR в config.py")
+            return False
+            
+        try:
+            await self.monitor.start_monitoring(chat_ids)
+            print(f"✅ Мониторинг изменений запущен для {len(chat_ids) if chat_ids else 'всех'} чатов")
+            return True
+        except Exception as e:
+            print(f"❌ Ошибка запуска мониторинга: {e}")
+            return False
+    
+    def stop_realtime_monitor(self):
+        """Останавливает мониторинг изменений"""
+        if self.monitor and self.monitor.is_running:
+            self.monitor.stop_monitoring()
+            print("🛑 Мониторинг изменений остановлен")
+            return True
+        return False

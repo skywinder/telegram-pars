@@ -28,6 +28,7 @@ RATE_LIMITING = {
 # Настройки базы данных
 DB_FILENAME = "telegram_history.db"  # Имя файла базы данных
 ENABLE_HISTORY_TRACKING = True  # Включить отслеживание истории изменений
+ENABLE_REALTIME_MONITOR = True  # Включить мониторинг изменений в реальном времени
 
 # Форматы экспорта
 EXPORT_FORMATS = {

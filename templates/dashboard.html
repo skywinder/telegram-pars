@@ -168,7 +168,7 @@
                             </thead>
                             <tbody>
                                 {% for chat in stats %}
-                                <tr>
+                                <tr class="chat-row" style="cursor: pointer;" onclick="window.location.href='{{ url_for('chat_detail', chat_id=chat.id) }}'">
                                     <td>{{ loop.index }}</td>
                                     <td>
                                         <i class="bi bi-chat-left-dots text-primary me-2"></i>
@@ -187,7 +187,7 @@
                                             <small class="text-muted">N/A</small>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td onclick="event.stopPropagation();">
                                         <a href="{{ url_for('chat_detail', chat_id=chat.id) }}"
                                            class="btn btn-sm btn-outline-info">
                                             <i class="bi bi-eye"></i>

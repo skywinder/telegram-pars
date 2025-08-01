@@ -591,3 +591,348 @@ select.form-select option {
         color: #ffffff;
     }
 }
+
+/* Messages page specific styles */
+/* Chat info card */
+.chat-info-card {
+    background-color: #ffffff;
+    border: 1px solid #e9ecef;
+}
+
+.chat-info-card .card-body {
+    background-color: #ffffff;
+    color: #212529;
+}
+
+.chat-info-card p {
+    color: #212529;
+    margin-bottom: 0.5rem;
+}
+
+.chat-info-card strong {
+    color: #495057;
+}
+
+.messages-container {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: var(--border-radius);
+}
+
+.messages-container .card {
+    background-color: #ffffff;
+    border: 1px solid #e9ecef;
+    transition: var(--transition);
+}
+
+.messages-container .card:hover {
+    border-color: var(--telegram-blue);
+    box-shadow: 0 2px 8px rgba(0, 136, 204, 0.1);
+}
+
+.messages-container .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    padding: 0.75rem 1rem;
+}
+
+.messages-container .card-body {
+    padding: 1rem;
+    background-color: #ffffff;
+    color: #212529;
+}
+
+.messages-container .card-body p {
+    color: #212529;
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+    word-wrap: break-word;
+}
+
+/* Message status badges */
+.messages-container .badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.messages-container .badge.bg-warning {
+    background-color: #ffc107 !important;
+    color: #000 !important;
+}
+
+.messages-container .badge.bg-danger {
+    background-color: #dc3545 !important;
+    color: #fff !important;
+}
+
+/* Edited message border */
+.messages-container .card.border-warning {
+    border-color: #ffc107 !important;
+    border-width: 2px;
+}
+
+/* Deleted message styling */
+.messages-container .card.border-danger {
+    border-color: #dc3545 !important;
+    border-width: 2px;
+}
+
+.messages-container .text-decoration-line-through {
+    color: #6c757d;
+    opacity: 0.7;
+}
+
+/* Message metadata */
+.messages-container .text-muted {
+    color: #6c757d !important;
+}
+
+/* Search highlight */
+mark {
+    background-color: #fff3cd;
+    color: #212529;
+    padding: 0.1rem;
+    border-radius: 2px;
+}
+
+/* Message actions */
+.messages-container .btn-outline-primary {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.75rem;
+}
+
+/* Improve contrast for info elements */
+.messages-container .bi {
+    margin-right: 0.25rem;
+}
+
+/* Dark mode support for messages */
+@media (prefers-color-scheme: dark) {
+    .messages-container {
+        background-color: #1a1a1a;
+    }
+    
+    .messages-container .card {
+        background-color: #2d2d2d;
+        border-color: #404040;
+    }
+    
+    .messages-container .card:hover {
+        border-color: var(--telegram-blue);
+    }
+    
+    .messages-container .card-header {
+        background-color: #333333;
+        border-bottom-color: #404040;
+    }
+    
+    .messages-container .card-body {
+        background-color: #2d2d2d;
+        color: #e0e0e0;
+    }
+    
+    .messages-container .card-body p {
+        color: #e0e0e0;
+    }
+    
+    .messages-container .text-muted {
+        color: #999999 !important;
+    }
+    
+    mark {
+        background-color: #664400;
+        color: #ffffff;
+    }
+}
+
+/* Dashboard specific fixes */
+/* Fix table text visibility */
+.table tbody tr td {
+    color: #212529 !important;
+}
+
+.table tbody tr td span.fw-bold {
+    color: #212529 !important;
+}
+
+.table tbody tr td small.text-muted {
+    color: #6c757d !important;
+}
+
+/* Fix card headers on dashboard */
+.card-header h5 {
+    color: #212529 !important;
+}
+
+/* Ensure text is visible in colored cards */
+.card.bg-primary h6.card-title,
+.card.bg-success h6.card-title,
+.card.bg-info h6.card-title,
+.card.bg-danger h6.card-title {
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.card.bg-warning h6.card-title {
+    color: rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Fix monitoring card text */
+.card.border-info .card-body h6 {
+    color: #0dcaf0 !important;
+}
+
+.card.border-info .card-body p,
+.card.border-info .card-body li {
+    color: #212529 !important;
+}
+
+/* Fix links in tables */
+.table a.btn {
+    color: inherit !important;
+}
+
+/* Ensure proper contrast for all text elements */
+.fw-bold {
+    font-weight: 600 !important;
+}
+
+/* Fix navbar brand */
+.navbar-brand,
+.navbar-brand:hover {
+    color: #fff !important;
+}
+
+/* Clickable table rows */
+.chat-row {
+    transition: var(--transition);
+}
+
+.chat-row:hover {
+    background-color: #f8f9fa;
+    transform: translateX(5px);
+    box-shadow: -5px 0 0 0 var(--telegram-blue);
+}
+
+/* Fix button inside clickable row */
+.chat-row td:last-child {
+    position: relative;
+}
+
+/* FORCE FIX ALL TEXT COLORS */
+/* Main headings */
+h1, h2, h3, h4, h5, h6 {
+    color: #212529 !important;
+}
+
+/* All paragraph and div text */
+p, div {
+    color: #212529 !important;
+}
+
+/* Force table text to be dark */
+.table td,
+.table th,
+.table tbody tr td,
+.table tbody tr td span,
+.table tbody tr td div,
+.table tbody tr td small {
+    color: #212529 !important;
+}
+
+/* Force bold text to be visible */
+.fw-bold,
+.font-weight-bold,
+strong,
+b {
+    color: #212529 !important;
+    font-weight: 600 !important;
+}
+
+/* Card headers - ensure dark text */
+.card-header,
+.card-header h5,
+.card-header h6,
+.card-header span {
+    color: #212529 !important;
+}
+
+/* Form controls text */
+.form-control,
+.form-select,
+.form-control::placeholder,
+.form-select option {
+    color: #212529 !important;
+}
+
+/* Input group text */
+.input-group-text {
+    color: #212529 !important;
+    background-color: #e9ecef !important;
+}
+
+/* Placeholder text */
+input::placeholder,
+textarea::placeholder {
+    color: #6c757d !important;
+    opacity: 1 !important;
+}
+
+/* Small and muted text */
+small,
+.small {
+    color: #6c757d !important;
+}
+
+.text-muted {
+    color: #6c757d !important;
+}
+
+/* Override Bootstrap card text colors for stat cards */
+.card.text-center h5:not(.text-white) {
+    color: inherit !important;
+}
+
+/* Ensure links are visible */
+a:not(.btn):not(.nav-link) {
+    color: var(--telegram-blue) !important;
+}
+
+/* Badge text colors */
+.badge {
+    color: #fff !important;
+}
+
+.badge.bg-secondary {
+    background-color: #6c757d !important;
+}
+
+.badge.bg-warning {
+    color: #000 !important;
+    background-color: #ffc107 !important;
+}
+
+/* Icons next to text should inherit color */
+.bi + span,
+.bi + div,
+.bi + .fw-bold {
+    color: #212529 !important;
+}
+
+/* Modal text */
+.modal-title,
+.modal-body,
+.modal-body p,
+.modal-body div,
+.modal-body span {
+    color: #212529 !important;
+}
+
+/* Tooltips */
+.tooltip-inner {
+    color: #fff !important;
+}
+
+/* Override any inline styles */
+[style*="color"] {
+    color: #212529 !important;
+}

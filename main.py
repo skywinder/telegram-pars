@@ -53,7 +53,7 @@ async def main():
         # 3. Главное меню
         while True:
             show_main_menu()
-            choice = input("\n👉 Выбери действие (1-9): ").strip()
+            choice = input("\n👉 Выбери действие (0-10): ").strip()
 
             if choice == "1":
                 # Показываем список чатов
@@ -91,6 +91,10 @@ async def main():
                 # Настройки
                 await show_settings_menu()
 
+            elif choice == "10":
+                # Мониторинг изменений в реальном времени
+                await realtime_monitor_menu(parser)
+
             elif choice == "0":
                 print("👋 До свидания!")
                 break
@@ -127,6 +131,7 @@ def show_main_menu():
     print("⚙️ ПРОЧЕЕ:")
     print("  8. 📊 Текущий статус парсинга")
     print("  9. ⚙️ Настройки")
+    print(" 10. 🔍 Мониторинг изменений (Real-time)")
     print("  0. ❌ Выход")
     print("="*50)
 
@@ -972,6 +977,154 @@ async def show_settings_menu():
 
     print("\n💡 Для изменения настроек отредактируйте config.py")
     input("\nНажми Enter...")
+
+async def realtime_monitor_menu(parser: TelegramParser):
+    """Меню управления мониторингом изменений"""
+    print("\n🔍 МОНИТОРИНГ ИЗМЕНЕНИЙ В РЕАЛЬНОМ ВРЕМЕНИ")
+    print("="*50)
+    
+    if not parser.monitor:
+        print("❌ Монитор не инициализирован!")
+        print("💡 Включите ENABLE_REALTIME_MONITOR в config.py")
+        input("\nНажми Enter...")
+        return
+    
+    while True:
+        print("\n" + "="*40)
+        print("🔍 МЕНЮ МОНИТОРИНГА:")
+        
+        # Показываем текущий статус
+        if parser.monitor.is_running:
+            print("✅ Статус: АКТИВЕН")
+            monitored = parser.monitor.monitored_chats
+            if monitored:
+                print(f"📊 Отслеживается чатов: {len(monitored)}")
+            else:
+                print("📊 Отслеживаются: ВСЕ ЧАТЫ")
+        else:
+            print("🔴 Статус: ОСТАНОВЛЕН")
+        
+        print("\n1. ▶️  Запустить мониторинг всех чатов")
+        print("2. 🎯 Запустить мониторинг выбранных чатов")
+        print("3. ⏹️  Остановить мониторинг")
+        print("4. 📊 Статистика изменений")
+        print("5. 📜 Последние изменения (24ч)")
+        print("6. ← Назад в главное меню")
+        print("="*40)
+        
+        choice = input("\n👉 Выбери (1-6): ").strip()
+        
+        if choice == "1":
+            # Запуск мониторинга всех чатов
+            if parser.monitor.is_running:
+                print("⚠️ Мониторинг уже запущен!")
+            else:
+                success = await parser.start_realtime_monitor()
+                if success:
+                    print("\n💡 Мониторинг работает в фоне")
+                    print("📱 Откройте веб-интерфейс для просмотра уведомлений")
+        
+        elif choice == "2":
+            # Выбор чатов для мониторинга
+            chats = await parser.get_chats_list()
+            print("\n📋 Доступные чаты:")
+            for i, chat in enumerate(chats[:20], 1):
+                print(f"{i:>2}. {chat['name'][:40]:40} (ID: {chat['id']})")
+            
+            print("\n💡 Введите номера чатов через запятую (например: 1,3,5)")
+            print("   или ID чатов (например: -1001234567890,123456789)")
+            
+            selection = input("👉 Выбор: ").strip()
+            
+            if selection:
+                try:
+                    # Парсим выбор
+                    chat_ids = []
+                    for item in selection.split(','):
+                        item = item.strip()
+                        if item.isdigit() and 1 <= int(item) <= len(chats):
+                            # Это номер из списка
+                            chat_ids.append(chats[int(item)-1]['id'])
+                        else:
+                            # Возможно это ID чата
+                            try:
+                                chat_id = int(item)
+                                chat_ids.append(chat_id)
+                            except ValueError:
+                                print(f"⚠️ Неверный выбор: {item}")
+                    
+                    if chat_ids:
+                        if parser.monitor.is_running:
+                            parser.stop_realtime_monitor()
+                        
+                        success = await parser.start_realtime_monitor(chat_ids)
+                        if success:
+                            print(f"\n✅ Мониторинг запущен для {len(chat_ids)} чатов")
+                
+                except Exception as e:
+                    print(f"❌ Ошибка: {e}")
+        
+        elif choice == "3":
+            # Остановка мониторинга
+            if parser.stop_realtime_monitor():
+                print("✅ Мониторинг остановлен")
+            else:
+                print("ℹ️ Мониторинг не был запущен")
+        
+        elif choice == "4":
+            # Статистика
+            if parser.monitor:
+                stats = await parser.monitor.get_statistics()
+                
+                print("\n📊 СТАТИСТИКА МОНИТОРИНГА:")
+                print(f"📝 Всего изменений: {stats.get('total_changes', 0)}")
+                print(f"⏰ За последние 24 часа: {stats.get('changes_24h', 0)}")
+                
+                if stats.get('changes_by_type'):
+                    print("\n📈 По типам:")
+                    for change_type in stats['changes_by_type']:
+                        print(f"  {change_type['type']}: {change_type['count']}")
+                
+                if stats.get('top_chats'):
+                    print("\n🏆 Топ чатов по изменениям:")
+                    for i, chat in enumerate(stats['top_chats'][:5], 1):
+                        print(f"  {i}. {chat['name']}: {chat['count']} изменений")
+                
+                input("\nНажми Enter...")
+        
+        elif choice == "5":
+            # Последние изменения
+            if parser.monitor:
+                changes = await parser.monitor.get_recent_changes(hours=24)
+                
+                if changes:
+                    print(f"\n📜 ПОСЛЕДНИЕ ИЗМЕНЕНИЯ (найдено {len(changes)}):")
+                    print("-" * 60)
+                    
+                    for change in changes[:20]:  # Показываем первые 20
+                        print(f"\n🕐 {change['detected_at']}")
+                        print(f"💬 Чат: {change['chat_name']}")
+                        print(f"📝 Тип: {change['action_type']}")
+                        print(f"🆔 ID сообщения: {change['message_id']}")
+                        
+                        if change['action_type'] == 'edited' and change.get('new_content'):
+                            new_text = change['new_content'].get('text', '')[:100]
+                            if new_text:
+                                print(f"📄 Новый текст: {new_text}...")
+                        
+                        print("-" * 60)
+                    
+                    if len(changes) > 20:
+                        print(f"\n... и еще {len(changes) - 20} изменений")
+                else:
+                    print("\n📭 Нет изменений за последние 24 часа")
+                
+                input("\nНажми Enter...")
+        
+        elif choice == "6":
+            break
+        else:
+            print("❌ Неверный выбор")
 
 def check_python_version():
     """Проверяем версию Python"""

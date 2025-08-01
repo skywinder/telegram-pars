@@ -18,6 +18,14 @@ import config
 app = Flask(__name__)
 app.secret_key = 'telegram_parser_secret_key_2024'  # Для flash сообщений
 
+# Отключаем кеширование для разработки
+@app.after_request
+def after_request(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, public, max-age=0"
+    response.headers["Expires"] = "0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
 # Глобальные объекты
 analytics = None
 ai_exporter = None
@@ -108,8 +116,13 @@ def chats():
         flash(f'Ошибка загрузки чатов: {e}', 'error')
         return render_template('chats.html', chats=[])
 
-@app.route('/chat/<int:chat_id>')
+@app.route('/chat/<chat_id>')
 def chat_detail(chat_id):
+    try:
+        chat_id = int(chat_id)
+    except ValueError:
+        flash('Неверный ID чата', 'error')
+        return redirect(url_for('chats'))
     """Детальная информация о чате"""
     if not analytics:
         return redirect(url_for('index'))
@@ -240,8 +253,12 @@ def api_export(export_type):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/chat-stats/<int:chat_id>')
+@app.route('/api/chat-stats/<chat_id>')
 def api_chat_stats(chat_id):
+    try:
+        chat_id = int(chat_id)
+    except ValueError:
+        return jsonify({'error': 'Неверный ID чата'}), 400
     """API для получения статистики чата"""
     if not analytics:
         return jsonify({'error': 'Analytics недоступен'}), 500
@@ -392,8 +409,13 @@ def message_history(chat_id, message_id):
         flash(f'Ошибка загрузки истории: {e}', 'error')
         return redirect(url_for('message_changes'))
 
-@app.route('/chat/<int:chat_id>/messages')
+@app.route('/chat/<chat_id>/messages')
 def chat_messages(chat_id):
+    try:
+        chat_id = int(chat_id)
+    except ValueError:
+        flash('Неверный ID чата', 'error')
+        return redirect(url_for('chats'))
     """Просмотр сообщений чата с подсветкой изменений"""
     if not db:
         return redirect(url_for('index'))
@@ -645,8 +667,12 @@ def api_check_for_changes():
             'error': str(e)
         }), 500
 
-@app.route('/api/chat/<int:chat_id>/messages-with-changes')
+@app.route('/api/chat/<chat_id>/messages-with-changes')
 def api_get_chat_messages_with_changes(chat_id):
+    try:
+        chat_id = int(chat_id)
+    except ValueError:
+        return jsonify({'error': 'Неверный ID чата'}), 400
     """API для получения всех сообщений чата с информацией об изменениях"""
     if not db:
         return jsonify({'error': 'База данных недоступна'}), 500
