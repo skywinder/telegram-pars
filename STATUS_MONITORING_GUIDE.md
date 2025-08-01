@@ -85,7 +85,7 @@ python status_monitor.py
 python web_interface.py
 ```
 
-2. Open browser: `http://localhost:5000`
+2. Open browser: `http://localhost:5001`
 
 3. **New API Endpoints:**
    - **GET** `/api/status` - Get current parsing status
@@ -110,7 +110,7 @@ python web_interface.py
 
 ### Status Endpoint
 ```bash
-curl http://localhost:5000/api/status
+curl http://localhost:5001/api/status
 ```
 
 **Response:**
@@ -145,7 +145,7 @@ curl http://localhost:5000/api/status
 
 ### Interrupt Endpoint
 ```bash
-curl -X POST http://localhost:5000/api/status/interrupt
+curl -X POST http://localhost:5001/api/status/interrupt
 ```
 
 **Response:**
@@ -164,7 +164,7 @@ python status_monitor.py --help
 ```
 
 **Arguments:**
-- `--url` - API base URL (default: http://localhost:5000)
+- `--url` - API base URL (default: http://localhost:5001)
 - `--interval` - Refresh interval in seconds (default: 2.0)
 
 **Examples:**
@@ -216,7 +216,7 @@ python status_monitor.py --url http://192.168.1.100:5000
 ### Status Monitor Not Working?
 ```bash
 # Check if web interface is running
-curl http://localhost:5000/api/status
+curl http://localhost:5001/api/status
 
 # If not, start web interface
 python web_interface.py

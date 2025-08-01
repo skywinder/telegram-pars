@@ -13,29 +13,30 @@ class TelegramAnalytics:
     """
     Класс для анализа данных Telegram
     """
-    
+
     def __init__(self, db_path: str):
         self.db_path = db_path
-    
+
     def get_most_active_chats(self, limit: int = 10, days: int = None) -> List[Dict]:
         """
         Находит самые активные чаты
-        
+
         Args:
             limit: Количество чатов в результате
             days: Период в днях (None = все время)
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            
+
             date_filter = ""
             params = []
-            
+
             if days:
                 date_filter = "AND m.date > datetime('now', '-{} days')".format(days)
-            
+
             query = f'''
-                SELECT 
+                SELECT
+                    c.id as chat_id,
                     c.name as chat_name,
                     c.type as chat_type,
                     COUNT(m.id) as message_count,
@@ -51,113 +52,113 @@ class TelegramAnalytics:
                 ORDER BY message_count DESC
                 LIMIT ?
             '''
-            
+
             params.append(limit)
             results = conn.execute(query, params).fetchall()
-            
+
             return [dict(row) for row in results]
-    
+
     def get_activity_by_time(self, chat_id: int = None) -> Dict:
         """
         Анализирует активность по времени (часы, дни недели)
         """
         with sqlite3.connect(self.db_path) as conn:
             chat_filter = f"AND chat_id = {chat_id}" if chat_id else ""
-            
+
             # Активность по часам
             hours_query = f'''
-                SELECT 
+                SELECT
                     strftime('%H', date) as hour,
                     COUNT(*) as message_count
-                FROM messages 
+                FROM messages
                 WHERE is_deleted = FALSE {chat_filter}
                 GROUP BY hour
                 ORDER BY hour
             '''
-            
+
             # Активность по дням недели (0=воскресенье, 6=суббота)
             weekdays_query = f'''
-                SELECT 
+                SELECT
                     strftime('%w', date) as weekday,
                     COUNT(*) as message_count
-                FROM messages 
+                FROM messages
                 WHERE is_deleted = FALSE {chat_filter}
                 GROUP BY weekday
                 ORDER BY weekday
             '''
-            
+
             hours_data = conn.execute(hours_query).fetchall()
             weekdays_data = conn.execute(weekdays_query).fetchall()
-            
+
             # Преобразуем дни недели в названия
-            weekday_names = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 
+            weekday_names = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда',
                            'Четверг', 'Пятница', 'Суббота']
-            
+
             return {
                 'by_hour': [{'hour': int(h), 'count': c} for h, c in hours_data],
                 'by_weekday': [
-                    {'weekday': weekday_names[int(w)], 'count': c} 
+                    {'weekday': weekday_names[int(w)], 'count': c}
                     for w, c in weekdays_data
                 ]
             }
-    
+
     def analyze_conversation_topics(self, chat_id: int = None, min_word_length: int = 4) -> Dict:
         """
         Анализирует темы разговоров через частотность слов
         """
         with sqlite3.connect(self.db_path) as conn:
             chat_filter = f"AND chat_id = {chat_id}" if chat_id else ""
-            
+
             messages = conn.execute(f'''
-                SELECT text FROM messages 
-                WHERE is_deleted = FALSE AND text IS NOT NULL 
+                SELECT text FROM messages
+                WHERE is_deleted = FALSE AND text IS NOT NULL
                 AND LENGTH(text) > 10 {chat_filter}
             ''').fetchall()
-            
+
             # Обработка текста
             word_counter = Counter()
             total_messages = len(messages)
-            
+
             # Стоп-слова (расширенный список)
-            stop_words = {'что', 'как', 'где', 'когда', 'кто', 'это', 'для', 'или', 
-                         'так', 'уже', 'все', 'еще', 'вот', 'там', 'тут', 'она', 
+            stop_words = {'что', 'как', 'где', 'когда', 'кто', 'это', 'для', 'или',
+                         'так', 'уже', 'все', 'еще', 'вот', 'там', 'тут', 'она',
                          'они', 'его', 'ему', 'нее', 'них', 'мне', 'нас', 'вас',
                          'the', 'and', 'you', 'that', 'was', 'for', 'are', 'with',
                          'https', 'http', 'www', 'com', 'org', 'net', 'status',
                          'this', 'they', 'from', 'have', 'been', 'will', 'more',
                          'чем', 'тем', 'том', 'под', 'при', 'без', 'над', 'про'}
-            
+
             for (text,) in messages:
                 if text:
                     # Извлекаем слова (только буквы, минимум нужной длины)
                     words = re.findall(r'[а-яёa-z]+', text.lower())
-                    
+
                     # Фильтруем по длине и стоп-словам
-                    filtered_words = [w for w in words 
+                    filtered_words = [w for w in words
                                     if len(w) >= min_word_length and w not in stop_words]
                     word_counter.update(filtered_words)
-            
+
             # Топ слов
             top_words = word_counter.most_common(50)
-            
+
             return {
                 'total_messages_analyzed': total_messages,
                 'unique_words': len(word_counter),
                 'top_words': [{'word': word, 'count': count} for word, count in top_words],
                 'word_frequency': dict(word_counter)
             }
-    
+
     def get_user_statistics(self, chat_id: int = None) -> List[Dict]:
         """
         Статистика по пользователям
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            
+
             chat_filter = f"AND m.chat_id = {chat_id}" if chat_id else ""
-            
+
             query = f'''
-                SELECT 
+                SELECT
                     u.id as user_id,
                     COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as full_name,
                     u.username,
@@ -172,20 +173,20 @@ class TelegramAnalytics:
                 GROUP BY u.id, u.first_name, u.last_name, u.username
                 ORDER BY message_count DESC
             '''
-            
+
             results = conn.execute(query).fetchall()
             return [dict(row) for row in results]
-    
+
     def get_message_changes_analytics(self) -> Dict:
         """
         Анализ изменений сообщений (редактирования, удаления)
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            
+
             # Общая статистика изменений
             changes_stats = conn.execute('''
-                SELECT 
+                SELECT
                     action_type,
                     COUNT(*) as count,
                     COUNT(DISTINCT chat_id) as affected_chats,
@@ -193,10 +194,10 @@ class TelegramAnalytics:
                 FROM message_history
                 GROUP BY action_type
             ''').fetchall()
-            
+
             # Чаты с наибольшим количеством изменений
             most_edited_chats = conn.execute('''
-                SELECT 
+                SELECT
                     c.name as chat_name,
                     COUNT(mh.id) as total_changes,
                     COUNT(CASE WHEN mh.action_type = 'edited' THEN 1 END) as edits,
@@ -207,10 +208,10 @@ class TelegramAnalytics:
                 ORDER BY total_changes DESC
                 LIMIT 10
             ''').fetchall()
-            
+
             # Активность изменений по времени (последние 30 дней)
             recent_changes = conn.execute('''
-                SELECT 
+                SELECT
                     DATE(timestamp) as date,
                     action_type,
                     COUNT(*) as count
@@ -219,28 +220,28 @@ class TelegramAnalytics:
                 GROUP BY DATE(timestamp), action_type
                 ORDER BY date DESC
             ''').fetchall()
-            
+
             return {
                 'changes_summary': [dict(row) for row in changes_stats],
                 'most_active_chats': [dict(row) for row in most_edited_chats],
                 'recent_activity': [dict(row) for row in recent_changes]
             }
-    
+
     def generate_chat_report(self, chat_id: int) -> Dict:
         """
         Генерирует полный отчет по чату
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            
+
             # Базовая информация о чате
             chat_info = conn.execute('''
                 SELECT name, type FROM chats WHERE id = ?
             ''', (chat_id,)).fetchone()
-            
+
             if not chat_info:
                 return {'error': 'Chat not found'}
-            
+
             # Собираем все данные
             report = {
                 'chat_info': dict(chat_info),
@@ -252,21 +253,21 @@ class TelegramAnalytics:
                 'user_stats': self.get_user_statistics(chat_id),
                 'changes_analytics': self.get_message_changes_analytics()
             }
-            
+
             return report
-    
+
     def generate_ai_friendly_summary(self, chat_id: int = None, max_messages: int = 100) -> Dict:
         """
         Создает сводку, оптимизированную для анализа ИИ
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            
+
             chat_filter = f"AND m.chat_id = {chat_id}" if chat_id else ""
-            
+
             # Получаем недавние сообщения
             recent_messages = conn.execute(f'''
-                SELECT 
+                SELECT
                     m.text,
                     m.date,
                     u.first_name,
@@ -275,17 +276,17 @@ class TelegramAnalytics:
                 FROM messages m
                 LEFT JOIN users u ON m.sender_id = u.id
                 LEFT JOIN chats c ON m.chat_id = c.id
-                WHERE m.is_deleted = FALSE 
-                AND m.text IS NOT NULL 
+                WHERE m.is_deleted = FALSE
+                AND m.text IS NOT NULL
                 AND LENGTH(m.text) > 5 {chat_filter}
                 ORDER BY m.date DESC
                 LIMIT ?
             ''', (max_messages,)).fetchall()
-            
+
             # Статистика для контекста
             stats = self.get_most_active_chats(limit=5)
             topics = self.analyze_conversation_topics(chat_id)
-            
+
             return {
                 'summary_type': 'ai_analysis_ready',
                 'created_at': datetime.now().isoformat(),
@@ -312,62 +313,62 @@ class TelegramAnalytics:
                     "Какие выводы можно сделать о характере участников?"
                 ]
             }
-    
+
     def analyze_conversation_starters(self, chat_id: int = None) -> Dict:
         """
         Анализирует кто чаще всего начинает диалоги
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            
+
             chat_filter = f"AND m.chat_id = {chat_id}" if chat_id else ""
-            
+
             # Получаем сообщения отсортированные по времени
             messages = conn.execute(f'''
-                SELECT 
+                SELECT
                     m.sender_id,
                     m.date,
                     m.text,
                     COALESCE(u.first_name, u.username, 'User_' || u.id) as sender_name
                 FROM messages m
                 LEFT JOIN users u ON m.sender_id = u.id
-                WHERE m.is_deleted = FALSE 
-                AND m.text IS NOT NULL 
+                WHERE m.is_deleted = FALSE
+                AND m.text IS NOT NULL
                 AND LENGTH(m.text) > 0 {chat_filter}
                 ORDER BY m.date ASC
             ''').fetchall()
-            
+
             if not messages:
                 return {'error': 'Нет сообщений для анализа'}
-            
+
             # Анализируем инициацию диалогов
             conversation_starters = Counter()
             last_sender = None
             conversation_gaps = []  # Промежутки между сообщениями
-            
+
             for i, msg in enumerate(messages):
                 current_time = datetime.fromisoformat(msg['date'])
-                
+
                 # Если это первое сообщение или прошло много времени с последнего
                 if i == 0:
                     conversation_starters[msg['sender_id']] += 1
                     last_sender = msg['sender_id']
                     continue
-                
+
                 prev_time = datetime.fromisoformat(messages[i-1]['date'])
                 time_gap = (current_time - prev_time).total_seconds() / 3600  # в часах
-                
+
                 # Если прошло больше 2 часов - считаем новым диалогом
                 if time_gap > 2 or msg['sender_id'] != last_sender:
                     conversation_starters[msg['sender_id']] += 1
-                
+
                 last_sender = msg['sender_id']
                 conversation_gaps.append(time_gap)
-            
+
             # Статистика по пользователям
             total_conversations = sum(conversation_starters.values())
             starter_stats = []
-            
+
             for sender_id, count in conversation_starters.most_common():
                 sender_name = next((msg['sender_name'] for msg in messages if msg['sender_id'] == sender_id), f'User_{sender_id}')
                 percentage = (count / total_conversations) * 100
@@ -377,7 +378,7 @@ class TelegramAnalytics:
                     'conversations_started': count,
                     'percentage': round(percentage, 1)
                 })
-            
+
             return {
                 'total_conversations': total_conversations,
                 'conversation_starters': starter_stats,
@@ -388,29 +389,29 @@ class TelegramAnalytics:
                     'total_messages': len(messages)
                 }
             }
-    
+
     def analyze_emoji_and_expressions(self, chat_id: int = None) -> Dict:
         """
         Анализирует использование эмодзи, гифок и текстовых смайликов
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            
+
             chat_filter = f"AND m.chat_id = {chat_id}" if chat_id else ""
-            
+
             # Получаем сообщения с текстом
             messages = conn.execute(f'''
-                SELECT 
+                SELECT
                     m.sender_id,
                     m.text,
                     m.media_type,
                     COALESCE(u.first_name, u.username, 'User_' || u.id) as sender_name
                 FROM messages m
                 LEFT JOIN users u ON m.sender_id = u.id
-                WHERE m.is_deleted = FALSE 
+                WHERE m.is_deleted = FALSE
                 AND m.text IS NOT NULL {chat_filter}
             ''').fetchall()
-            
+
             # Паттерны для текстовых смайликов
             text_smilies = [
                 r':\)', r':\(', r':D', r':P', r':p', r';\)', r':\|',
@@ -420,7 +421,7 @@ class TelegramAnalytics:
                 r':-\)', r':-\(', r':-D', r':-P', r':-p', r';\-\)',
                 r':-\|', r':-o', r':-O', r':\-\*'
             ]
-            
+
             # Статистика по пользователям
             user_stats = defaultdict(lambda: {
                 'total_messages': 0,
@@ -432,18 +433,18 @@ class TelegramAnalytics:
                 'unique_emojis': set(),
                 'sender_name': ''
             })
-            
+
             all_emojis = Counter()
             all_text_smilies = Counter()
-            
+
             for msg in messages:
                 sender_id = msg['sender_id']
                 text = msg['text'] or ''
                 media_type = msg['media_type'] or ''
-                
+
                 user_stats[sender_id]['total_messages'] += 1
                 user_stats[sender_id]['sender_name'] = msg['sender_name']
-                
+
                 # Анализ эмодзи
                 emojis_in_msg = [char for char in text if char in emoji.EMOJI_DATA]
                 if emojis_in_msg:
@@ -451,22 +452,22 @@ class TelegramAnalytics:
                     user_stats[sender_id]['emoji_count'] += len(emojis_in_msg)
                     user_stats[sender_id]['unique_emojis'].update(emojis_in_msg)
                     all_emojis.update(emojis_in_msg)
-                
+
                 # Анализ текстовых смайликов
                 text_smilies_found = []
                 for smiley_pattern in text_smilies:
                     matches = re.findall(smiley_pattern, text)
                     text_smilies_found.extend(matches)
-                
+
                 if text_smilies_found:
                     user_stats[sender_id]['text_smilies_messages'] += 1
                     user_stats[sender_id]['text_smilies_count'] += len(text_smilies_found)
                     all_text_smilies.update(text_smilies_found)
-                
+
                 # Анализ гифок и стикеров
                 if 'gif' in media_type.lower() or 'sticker' in media_type.lower():
                     user_stats[sender_id]['gif_sticker_messages'] += 1
-            
+
             # Преобразуем в удобный формат
             result_stats = []
             for sender_id, stats in user_stats.items():
@@ -474,7 +475,7 @@ class TelegramAnalytics:
                     emoji_freq = (stats['emoji_messages'] / stats['total_messages']) * 100
                     text_smiley_freq = (stats['text_smilies_messages'] / stats['total_messages']) * 100
                     gif_freq = (stats['gif_sticker_messages'] / stats['total_messages']) * 100
-                    
+
                     result_stats.append({
                         'sender_id': sender_id,
                         'sender_name': stats['sender_name'],
@@ -496,10 +497,10 @@ class TelegramAnalytics:
                             'gif_frequency_percent': round(gif_freq, 1)
                         }
                     })
-            
+
             # Сортируем по общей частоте использования эмодзи
             result_stats.sort(key=lambda x: x['emoji_usage']['emoji_frequency_percent'], reverse=True)
-            
+
             return {
                 'user_expression_stats': result_stats,
                 'global_stats': {

@@ -17,7 +17,7 @@ import requests
 class StatusMonitor:
     """Real-time status monitor for Telegram Parser operations"""
 
-    def __init__(self, api_base_url: str = "http://localhost:5000"):
+    def __init__(self, api_base_url: str = "http://localhost:5001"):
         self.api_base_url = api_base_url
         self.running = True
         self.last_status = None
@@ -82,7 +82,7 @@ class StatusMonitor:
 
         if status_data['status'] == 'connection_error':
             print(f"❌ Ошибка соединения: {status_data['message']}")
-            print("💡 Убедитесь, что веб-интерфейс запущен на http://localhost:5000")
+            print("💡 Убедитесь, что веб-интерфейс запущен на http://localhost:5001")
             return
 
         if status_data['status'] != 'success':
@@ -181,8 +181,8 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Telegram Parser Status Monitor')
-    parser.add_argument('--url', default='http://localhost:5000',
-                       help='Base URL for Telegram Parser API (default: http://localhost:5000)')
+    parser.add_argument('--url', default='http://localhost:5001',
+                       help='Base URL for Telegram Parser API (default: http://localhost:5001)')
     parser.add_argument('--interval', type=float, default=2.0,
                        help='Refresh interval in seconds (default: 2.0)')
 

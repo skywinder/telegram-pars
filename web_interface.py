@@ -49,15 +49,15 @@ def index():
         return render_template('no_data.html')
 
     try:
-        # Получаем базовую статистику
-        stats = analytics.get_chat_statistics()[:10]  # Топ 10 чатов
+                # Получаем базовую статистику
+        stats = analytics.get_most_active_chats(limit=10)  # Топ 10 чатов
 
         # Общая статистика
-        total_chats = len(analytics.get_chat_statistics())
-        total_messages = sum(s['total_messages'] for s in analytics.get_chat_statistics())
+        total_chats = len(analytics.get_most_active_chats(limit=1000))  # Большой лимит для подсчета всех
+        total_messages = sum(s['message_count'] for s in analytics.get_most_active_chats(limit=1000))
 
         # Последние изменения
-        changes_summary = analytics.get_changes_summary(days=7)
+        changes_summary = analytics.get_message_changes_analytics()
 
         return render_template('dashboard.html',
                              stats=stats,
@@ -75,7 +75,7 @@ def chats():
         return redirect(url_for('index'))
 
     try:
-        chats_data = analytics.get_chat_statistics()
+        chats_data = analytics.get_most_active_chats(limit=1000)  # Все чаты
         return render_template('chats.html', chats=chats_data)
     except Exception as e:
         flash(f'Ошибка загрузки чатов: {e}', 'error')
@@ -206,8 +206,8 @@ def api_chat_stats(chat_id):
 
     try:
         # Базовая статистика
-        stats = analytics.get_chat_statistics()
-        chat_stats = next((s for s in stats if s['id'] == chat_id), None)
+        stats = analytics.get_most_active_chats(limit=1000)
+        chat_stats = next((s for s in stats if s.get('chat_id') == chat_id), None)
 
         if not chat_stats:
             return jsonify({'error': 'Чат не найден'}), 404
@@ -348,11 +348,11 @@ if __name__ == '__main__':
     # Инициализируем приложение
     if init_app():
         print("✅ Приложение готово!")
-        print("🌐 Открой в браузере: http://localhost:5001")
+        print("🌐 Открой в браузере: http://localhost:5002")
         print("⏹️  Для остановки нажми Ctrl+C")
 
         # Запускаем в режиме разработки
-        app.run(debug=True, host='0.0.0.0', port=5001)
+        app.run(debug=True, host='0.0.0.0', port=5002)
     else:
         print("❌ Не удалось запустить приложение")
         print("💡 Подсказка: Сначала запустите парсинг для создания базы данных")
