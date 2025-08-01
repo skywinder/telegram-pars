@@ -5,6 +5,7 @@
 import asyncio
 import sys
 import os
+from datetime import datetime
 from telegram_parser import TelegramParser
 from data_exporter import DataExporter
 from analytics import TelegramAnalytics
@@ -83,10 +84,14 @@ async def main():
                 await show_database_stats(parser.db)
 
             elif choice == "8":
+                # Текущий статус парсинга
+                await show_current_status(parser)
+
+            elif choice == "9":
                 # Настройки
                 await show_settings_menu()
 
-            elif choice == "9":
+            elif choice == "0":
                 print("👋 До свидания!")
                 break
 
@@ -120,8 +125,9 @@ def show_main_menu():
     print("  7. 🗄️ Статистика базы данных")
     print()
     print("⚙️ ПРОЧЕЕ:")
-    print("  8. ⚙️ Настройки")
-    print("  9. ❌ Выход")
+    print("  8. 📊 Текущий статус парсинга")
+    print("  9. ⚙️ Настройки")
+    print("  0. ❌ Выход")
     print("="*50)
 
 async def show_chats_list(parser: TelegramParser):
@@ -164,38 +170,61 @@ async def parse_single_chat(parser: TelegramParser, exporter: DataExporter):
                 limit = config.MAX_MESSAGES
 
             print(f"\n🚀 Парсим чат '{selected_chat['name']}'...")
+            print("💡 Нажми Ctrl+C в любой момент для остановки парсинга")
 
             # Создаем сессию если есть БД
             session_id = None
             if parser.db:
                 session_id = parser.db.create_scan_session()
 
-            # Парсим чат
-            messages = await parser.parse_chat_messages(selected_chat['id'], limit, session_id)
+            # Запускаем мониторинг статуса в фоне
+            monitor_task = asyncio.create_task(monitor_parsing_status(parser))
 
-            # Создаем структуру данных для экспорта
-            export_data = {
-                'timestamp': f"{__import__('datetime').datetime.now().isoformat()}",
-                'total_chats': 1,
-                'chats': {
-                    str(selected_chat['id']): {
-                        'info': selected_chat,
-                        'messages': messages,
-                        'total_messages': len(messages)
+            try:
+                # Парсим чат
+                messages = await parser.parse_chat_messages(selected_chat['id'], limit, session_id)
+                
+                # Останавливаем мониторинг
+                monitor_task.cancel()
+                
+                print(f"\n✅ Парсинг завершен! Спарсено {len(messages)} сообщений")
+
+                # Создаем структуру данных для экспорта
+                export_data = {
+                    'timestamp': f"{__import__('datetime').datetime.now().isoformat()}",
+                    'total_chats': 1,
+                    'chats': {
+                        str(selected_chat['id']): {
+                            'info': selected_chat,
+                            'messages': messages,
+                            'total_messages': len(messages)
+                        }
                     }
                 }
-            }
 
-            # Экспортируем
-            exported_files = exporter.export_all_formats(export_data)
+                # Экспортируем
+                exported_files = exporter.export_all_formats(export_data)
 
-            # Предлагаем создать AI экспорт
-            if parser.db:
-                create_ai = input("\n🤖 Создать файлы для AI анализа? (y/N): ").strip().lower()
-                if create_ai in ['y', 'yes', 'да', 'д']:
-                    ai_exp = AIExporter(parser.db.db_path)
-                    ai_files = ai_exp.create_complete_ai_package(selected_chat['id'])
-                    print("✅ AI файлы созданы!")
+                # Предлагаем создать AI экспорт
+                if parser.db:
+                    create_ai = input("\n🤖 Создать файлы для AI анализа? (y/N): ").strip().lower()
+                    if create_ai in ['y', 'yes', 'да', 'д']:
+                        ai_exp = AIExporter(parser.db.db_path)
+                        ai_files = ai_exp.create_complete_ai_package(selected_chat['id'])
+                        print("✅ AI файлы созданы!")
+
+            except KeyboardInterrupt:
+                print("\n⏹️ Остановка парсинга...")
+                parser.request_interruption()
+                
+                # Ждем завершения
+                try:
+                    await asyncio.wait_for(monitor_task, timeout=5.0)
+                except asyncio.TimeoutError:
+                    monitor_task.cancel()
+                
+                print("✅ Парсинг остановлен. Данные сохранены.")
+                return
 
         else:
             print("❌ Неверный номер чата")
@@ -218,9 +247,19 @@ async def parse_all_chats(parser: TelegramParser, exporter: DataExporter):
         print("❌ Отменено")
         return
 
+    print("💡 Нажми Ctrl+C в любой момент для остановки парсинга")
+
+    # Запускаем мониторинг статуса в фоне
+    monitor_task = asyncio.create_task(monitor_parsing_status(parser))
+
     try:
         # Парсим все чаты
         all_data = await parser.parse_all_chats()
+        
+        # Останавливаем мониторинг
+        monitor_task.cancel()
+        
+        print(f"\n✅ Парсинг всех чатов завершен!")
 
         # Экспортируем результаты
         exported_files = exporter.export_all_formats(all_data)
@@ -240,8 +279,22 @@ async def parse_all_chats(parser: TelegramParser, exporter: DataExporter):
                 ai_files = ai_exp.create_complete_ai_package()
                 print("✅ AI анализ создан!")
 
+    except KeyboardInterrupt:
+        print("\n⏹️ Остановка парсинга...")
+        parser.request_interruption()
+        
+        # Ждем завершения
+        try:
+            await asyncio.wait_for(monitor_task, timeout=5.0)
+        except asyncio.TimeoutError:
+            monitor_task.cancel()
+        
+        print("✅ Парсинг остановлен. Данные сохранены.")
+        return
+
     except Exception as e:
         print(f"❌ Ошибка при парсинге: {e}")
+        monitor_task.cancel()
 
 async def show_analytics_menu(analytics: TelegramAnalytics, ai_exporter: AIExporter):
     """Меню аналитики"""
@@ -572,6 +625,49 @@ async def show_changes_history(analytics: TelegramAnalytics):
 
     input("\nНажми Enter...")
 
+async def monitor_parsing_status(parser: TelegramParser):
+    """Мониторинг статуса парсинга в реальном времени"""
+    last_status = None
+    
+    while True:
+        try:
+            status = parser.get_current_status()
+            
+            # Показываем статус только если он изменился
+            if status != last_status:
+                if status['is_active']:
+                    operation = status['current_operation'] or 'Парсинг'
+                    chat_name = status['current_chat'] or 'Неизвестный чат'
+                    
+                    print(f"\n📊 {operation}: {chat_name}")
+                    
+                    if status['progress']['total_chats'] > 0:
+                        progress = (status['progress']['processed_chats'] / status['progress']['total_chats']) * 100
+                        print(f"   Прогресс: {status['progress']['processed_chats']}/{status['progress']['total_chats']} чатов ({progress:.1f}%)")
+                    
+                    if status['progress']['estimated_time_remaining']:
+                        print(f"   ⏱️ Осталось примерно: {status['progress']['estimated_time_remaining']}")
+                    
+                    # Показываем статистику API
+                    api_stats = parser.get_session_statistics()
+                    if api_stats:
+                        print(f"   📡 API запросов: {api_stats['total_requests']}, ошибок: {api_stats['errors']}")
+                
+                last_status = status
+            
+            # Проверяем запрос на прерывание
+            if parser.check_interruption_requested():
+                print("\n🛑 Получен запрос на остановку...")
+                break
+            
+            await asyncio.sleep(2)  # Обновляем каждые 2 секунды
+            
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"⚠️ Ошибка мониторинга: {e}")
+            break
+
 async def show_database_stats(db: TelegramDatabase):
     """Показывает статистику базы данных"""
     if not db:
@@ -597,6 +693,43 @@ async def show_database_stats(db: TelegramDatabase):
     for i, stat in enumerate(stats[:5], 1):
         print(f"  {i}. {stat['name']}: {stat['total_messages']} сообщений")
 
+    input("\nНажми Enter...")
+
+async def show_current_status(parser: TelegramParser):
+    """Показывает текущий статус парсинга"""
+    print("\n📊 ТЕКУЩИЙ СТАТУС ПАРСИНГА:")
+    
+    status = parser.get_current_status()
+    
+    if status['is_active']:
+        print("🟢 Парсинг активен")
+        print(f"📋 Операция: {status['current_operation'] or 'Неизвестно'}")
+        print(f"💬 Текущий чат: {status['current_chat'] or 'Неизвестно'}")
+        
+        if status['progress']['total_chats'] > 0:
+            progress = (status['progress']['processed_chats'] / status['progress']['total_chats']) * 100
+            print(f"📈 Прогресс: {status['progress']['processed_chats']}/{status['progress']['total_chats']} чатов ({progress:.1f}%)")
+        
+        if status['progress']['estimated_time_remaining']:
+            print(f"⏱️ Осталось примерно: {status['progress']['estimated_time_remaining']}")
+        
+        if status['last_update']:
+            print(f"🕐 Последнее обновление: {status['last_update']}")
+    else:
+        print("🔴 Парсинг не активен")
+    
+    # Показываем статистику API
+    api_stats = parser.get_session_statistics()
+    if api_stats:
+        print(f"\n📡 СТАТИСТИКА API:")
+        print(f"   Всего запросов: {api_stats['total_requests']}")
+        print(f"   FloodWait ошибок: {api_stats['flood_waits']}")
+        print(f"   Других ошибок: {api_stats['errors']}")
+        
+        if api_stats['start_time']:
+            duration = datetime.now() - api_stats['start_time']
+            print(f"   Время работы: {duration}")
+    
     input("\nНажми Enter...")
 
 async def show_settings_menu():
