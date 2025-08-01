@@ -600,11 +600,11 @@ def api_request_interrupt():
 
 @app.route('/api/check-for-changes', methods=['POST'])
 def api_check_for_changes():
-    """API для проверки новых изменений в сообщениях"""
-    if not active_parser:
+    """API для получения последних изменений из БД"""
+    if not db:
         return jsonify({
             'success': False,
-            'error': 'Парсер не активен. Запустите парсинг для проверки изменений.'
+            'error': 'База данных недоступна'
         }), 400
     
     try:
@@ -612,21 +612,124 @@ def api_check_for_changes():
         chat_id = data.get('chat_id')
         hours_threshold = data.get('hours_threshold', 24)
         
-        # Используем метод парсера для проверки изменений
-        changes_result = asyncio.run(active_parser.check_for_changes(
-            chat_id=chat_id,
-            hours_threshold=hours_threshold
-        ))
+        # Получаем последние изменения из БД
+        start_date = (datetime.now() - timedelta(hours=hours_threshold)).isoformat()
+        
+        # Получаем изменения за период
+        changes = db.get_message_changes_by_date(
+            start_date=start_date,
+            action_type=None  # Все типы изменений
+        )
+        
+        # Фильтруем по chat_id если указан
+        if chat_id:
+            changes = [c for c in changes if c.get('chat_id') == chat_id]
+        
+        # Подсчитываем статистику
+        edited_count = len([c for c in changes if c.get('action_type') == 'edited'])
+        deleted_count = len([c for c in changes if c.get('action_type') == 'deleted'])
         
         return jsonify({
             'success': True,
-            'changes_found': changes_result
+            'changes_found': {
+                'total_changes': len(changes),
+                'edited_messages': edited_count,
+                'deleted_messages': deleted_count,
+                'changes': changes[:100]  # Последние 100 изменений
+            },
+            'message': f'Найдено {len(changes)} изменений за последние {hours_threshold} часов'
         })
     except Exception as e:
         return jsonify({
             'success': False,
             'error': str(e)
         }), 500
+
+@app.route('/api/chat/<int:chat_id>/messages-with-changes')
+def api_get_chat_messages_with_changes(chat_id):
+    """API для получения всех сообщений чата с информацией об изменениях"""
+    if not db:
+        return jsonify({'error': 'База данных недоступна'}), 500
+    
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        filter_type = request.args.get('filter', 'all')  # all, changed, unchanged
+        
+        with sqlite3.connect(db.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            # Основной запрос для получения сообщений с информацией об изменениях
+            query = '''
+                SELECT 
+                    m.id,
+                    m.text,
+                    m.date,
+                    m.is_deleted,
+                    m.sender_id,
+                    u.username,
+                    u.first_name,
+                    u.last_name,
+                    COALESCE(
+                        (SELECT COUNT(*) FROM message_history 
+                         WHERE message_id = m.id AND chat_id = m.chat_id 
+                         AND action_type = 'edited'), 0
+                    ) as edit_count,
+                    (SELECT MAX(timestamp) FROM message_history 
+                     WHERE message_id = m.id AND chat_id = m.chat_id 
+                     AND action_type = 'edited') as last_edit_time,
+                    (SELECT old_text FROM message_history 
+                     WHERE message_id = m.id AND chat_id = m.chat_id 
+                     AND action_type = 'edited'
+                     ORDER BY timestamp DESC LIMIT 1) as previous_text
+                FROM messages m
+                LEFT JOIN users u ON m.sender_id = u.id
+                WHERE m.chat_id = ?
+            '''
+            
+            params = [chat_id]
+            
+            # Применяем фильтр
+            if filter_type == 'changed':
+                query += ''' AND (m.is_deleted = TRUE OR EXISTS (
+                    SELECT 1 FROM message_history 
+                    WHERE message_id = m.id AND chat_id = m.chat_id
+                ))'''
+            elif filter_type == 'unchanged':
+                query += ''' AND m.is_deleted = FALSE AND NOT EXISTS (
+                    SELECT 1 FROM message_history 
+                    WHERE message_id = m.id AND chat_id = m.chat_id
+                )'''
+            
+            # Пагинация
+            query += ' ORDER BY m.date DESC LIMIT ? OFFSET ?'
+            params.extend([per_page, (page - 1) * per_page])
+            
+            messages = conn.execute(query, params).fetchall()
+            
+            # Получаем общее количество
+            count_query = 'SELECT COUNT(*) FROM messages WHERE chat_id = ?'
+            total_count = conn.execute(count_query, [chat_id]).fetchone()[0]
+            
+            # Получаем информацию о чате
+            chat_info = conn.execute(
+                'SELECT name, type FROM chats WHERE id = ?', 
+                [chat_id]
+            ).fetchone()
+        
+        return jsonify({
+            'success': True,
+            'chat': dict(chat_info) if chat_info else None,
+            'messages': [dict(m) for m in messages],
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total_count,
+                'pages': (total_count + per_page - 1) // per_page
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 def set_active_parser(parser):
     """Устанавливает активный парсер для мониторинга"""

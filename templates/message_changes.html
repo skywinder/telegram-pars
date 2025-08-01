@@ -5,10 +5,20 @@
 {% block content %}
 <div class="row">
     <div class="col-12">
-        <h2 class="mb-4">
-            <i class="bi bi-pencil-square"></i> Измененные сообщения
-            <small class="text-muted fs-6">Отслеживание изменений и удалений</small>
-        </h2>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-1">
+                    <i class="bi bi-pencil-square"></i> Измененные сообщения
+                </h2>
+                <p class="text-muted mb-0">Отслеживание редактирования и удаления сообщений</p>
+            </div>
+            <div class="text-end">
+                <small class="text-muted">
+                    <i class="bi bi-info-circle"></i> 
+                    Для обнаружения изменений необходимо регулярно запускать парсинг
+                </small>
+            </div>
+        </div>
         
         <!-- Статистика изменений -->
         {% if changes %}
@@ -71,7 +81,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">Количество</label>
                         <select name="limit" class="form-select" onchange="this.form.submit()">
                             <option value="50">50</option>
@@ -80,13 +90,23 @@
                             <option value="500">500</option>
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">&nbsp;</label>
-                        <div>
-                            <button type="button" class="btn btn-primary w-100" onclick="checkForNewChanges()">
-                                <i class="bi bi-arrow-clockwise"></i> Проверить изменения
-                            </button>
-                        </div>
+                        <button type="button" class="btn btn-primary w-100" onclick="checkForNewChanges()">
+                            <i class="bi bi-arrow-clockwise"></i> Проверить
+                        </button>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        {% if selected_chat_id %}
+                        <a href="{{ url_for('chat_messages', chat_id=selected_chat_id) }}" class="btn btn-info w-100">
+                            <i class="bi bi-chat-text"></i> Все сообщения
+                        </a>
+                        {% else %}
+                        <button class="btn btn-secondary w-100" disabled>
+                            <i class="bi bi-chat-text"></i> Выберите чат
+                        </button>
+                        {% endif %}
                     </div>
                 </form>
             </div>
@@ -95,24 +115,30 @@
         <!-- Список изменений -->
         {% if changes %}
             <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
+                <table class="table table-hover table-striped">
+                    <thead class="table-light">
                         <tr>
-                            <th>Дата изменения</th>
-                            <th>Тип</th>
-                            <th>Чат</th>
-                            <th>Автор</th>
-                            <th>Изменение</th>
-                            <th>Действия</th>
+                            <th style="width: 150px;">
+                                <a href="#" onclick="sortTable('date')">Дата изменения <i class="bi bi-arrow-down-up"></i></a>
+                            </th>
+                            <th style="width: 100px;">Тип</th>
+                            <th style="width: 200px;">Чат</th>
+                            <th style="width: 150px;">Автор</th>
+                            <th>Сообщение</th>
+                            <th style="width: 100px;">Действия</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for change in changes %}
-                            <tr>
+                            <tr class="{% if change.change_type == 'deleted' or change.deleted_text %}table-danger{% endif %}">
                                 <td>
                                     {% if change.timestamp %}
                                         <small title="{{ change.timestamp }}">
                                             {{ change.timestamp[:19] if change.timestamp|length > 19 else change.timestamp }}
+                                        </small>
+                                    {% elif change.message_date %}
+                                        <small title="Дата сообщения: {{ change.message_date }}">
+                                            {{ change.message_date[:19] if change.message_date|length > 19 else change.message_date }}
                                         </small>
                                     {% else %}
                                         <small class="text-muted">Нет данных</small>
@@ -139,27 +165,36 @@
                                 </td>
                                 <td>
                                     <small>
-                                        {% if change.first_name %}
-                                            {{ change.first_name }}
-                                        {% elif change.username %}
-                                            @{{ change.username }}
-                                        {% else %}
-                                            User {{ change.sender_id }}
+                                        {% if change.first_name or change.last_name %}
+                                            {{ change.first_name or '' }} {{ change.last_name or '' }}
+                                        {% endif %}
+                                        {% if change.username %}
+                                            <span class="text-muted">@{{ change.username }}</span>
+                                        {% elif not change.first_name and not change.last_name %}
+                                            <span class="text-muted">User {{ change.sender_id or 'Unknown' }}</span>
                                         {% endif %}
                                     </small>
                                 </td>
                                 <td>
                                     {% if change.change_type == 'edited' or (not change.change_type and change.edit_count) %}
-                                        <div class="text-truncate" style="max-width: 400px;">
+                                        <div style="max-width: 500px;">
                                             {% if change.current_text %}
-                                                <span class="text-primary">{{ change.current_text[:100] }}{% if change.current_text|length > 100 %}...{% endif %}</span>
-                                            {% else %}
-                                                <em class="text-muted">Текст недоступен</em>
+                                                <div class="mb-1">
+                                                    <strong>Текущий текст:</strong><br>
+                                                    <span class="text-primary">{{ change.current_text[:200] }}{% if change.current_text|length > 200 %}...{% endif %}</span>
+                                                </div>
+                                            {% endif %}
+                                            {% if change.old_text %}
+                                                <div>
+                                                    <strong>Предыдущий:</strong><br>
+                                                    <span class="text-muted"><del>{{ change.old_text[:200] }}{% if change.old_text|length > 200 %}...{% endif %}</del></span>
+                                                </div>
                                             {% endif %}
                                         </div>
                                     {% elif change.change_type == 'deleted' or (not change.change_type and change.deleted_text) %}
-                                        <div class="text-truncate text-muted" style="max-width: 400px;">
-                                            <del>{{ (change.deleted_text or change.text or 'Текст недоступен')[:100] }}{% if (change.deleted_text or change.text or '')|length > 100 %}...{% endif %}</del>
+                                        <div style="max-width: 500px;">
+                                            <strong>Удаленное сообщение:</strong><br>
+                                            <span class="text-danger"><del>{{ (change.deleted_text or change.text or 'Текст недоступен')[:200] }}{% if (change.deleted_text or change.text or '')|length > 200 %}...{% endif %}</del></span>
                                         </div>
                                     {% endif %}
                                 </td>
@@ -186,12 +221,37 @@
 <!-- Скрипт для динамической загрузки изменений -->
 <script>
 function checkForNewChanges() {
-    const btn = event.target;
+    const btn = event.target.closest('button');
     const originalText = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Проверка...';
     
     const chatId = document.querySelector('select[name="chat_id"]').value;
+    
+    // Создаем модальное окно для отображения результатов
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Проверка изменений</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Загрузка...</span>
+                        </div>
+                        <p class="mt-2">Проверяем изменения за последние 24 часа...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
     
     fetch('/api/check-for-changes', {
         method: 'POST',
@@ -206,28 +266,126 @@ function checkForNewChanges() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            const modalBody = modal.querySelector('.modal-body');
             if (data.changes_found && data.changes_found.total_changes > 0) {
-                alert(`Найдено изменений: ${data.changes_found.total_changes}\n` +
-                      `Отредактировано: ${data.changes_found.edited_messages}\n` +
-                      `Удалено: ${data.changes_found.deleted_messages}\n\n` +
-                      `Страница будет обновлена.`);
-                window.location.reload();
+                modalBody.innerHTML = `
+                    <div class="alert alert-success">
+                        <h5><i class="bi bi-check-circle"></i> Найдены изменения!</h5>
+                        <ul class="mb-0">
+                            <li>Всего изменений: <strong>${data.changes_found.total_changes}</strong></li>
+                            <li>Отредактировано сообщений: <strong>${data.changes_found.edited_messages}</strong></li>
+                            <li>Удалено сообщений: <strong>${data.changes_found.deleted_messages}</strong></li>
+                        </ul>
+                    </div>
+                    <p>${data.message || ''}</p>
+                    <div class="text-center">
+                        <button class="btn btn-primary" onclick="window.location.reload()">
+                            <i class="bi bi-arrow-clockwise"></i> Обновить страницу
+                        </button>
+                    </div>
+                `;
             } else {
-                alert('Новых изменений не найдено');
+                modalBody.innerHTML = `
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-info-circle"></i> Изменений не найдено</h5>
+                        <p>За последние 24 часа изменений в сообщениях не обнаружено.</p>
+                    </div>
+                    <p class="text-muted">Совет: Для обнаружения изменений необходимо регулярно запускать парсинг чатов.</p>
+                `;
             }
         } else {
-            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+            const modalBody = modal.querySelector('.modal-body');
+            modalBody.innerHTML = `
+                <div class="alert alert-danger">
+                    <h5><i class="bi bi-exclamation-triangle"></i> Ошибка</h5>
+                    <p>${data.error || 'Произошла неизвестная ошибка при проверке изменений.'}</p>
+                </div>
+                <p class="text-muted">Убедитесь, что база данных доступна и содержит историю сообщений.</p>
+            `;
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Ошибка при проверке изменений');
+        const modalBody = modal.querySelector('.modal-body');
+        modalBody.innerHTML = `
+            <div class="alert alert-danger">
+                <h5><i class="bi bi-exclamation-triangle"></i> Ошибка соединения</h5>
+                <p>Не удалось проверить изменения: ${error.message}</p>
+            </div>
+        `;
     })
     .finally(() => {
         btn.disabled = false;
         btn.innerHTML = originalText;
+        // Удаляем модальное окно после закрытия
+        modal.addEventListener('hidden.bs.modal', () => {
+            document.body.removeChild(modal);
+        });
     });
 }
+
+// Функция сортировки таблицы
+function sortTable(column) {
+    const table = document.querySelector('.table tbody');
+    const rows = Array.from(table.querySelectorAll('tr'));
+    
+    rows.sort((a, b) => {
+        let aValue, bValue;
+        
+        switch(column) {
+            case 'date':
+                aValue = a.cells[0].textContent.trim();
+                bValue = b.cells[0].textContent.trim();
+                break;
+            case 'type':
+                aValue = a.cells[1].textContent.trim();
+                bValue = b.cells[1].textContent.trim();
+                break;
+            case 'chat':
+                aValue = a.cells[2].textContent.trim();
+                bValue = b.cells[2].textContent.trim();
+                break;
+            case 'author':
+                aValue = a.cells[3].textContent.trim();
+                bValue = b.cells[3].textContent.trim();
+                break;
+        }
+        
+        if (column === 'date') {
+            return new Date(bValue) - new Date(aValue); // Сортировка по убыванию для дат
+        }
+        return aValue.localeCompare(bValue);
+    });
+    
+    // Очищаем таблицу и добавляем отсортированные строки
+    table.innerHTML = '';
+    rows.forEach(row => table.appendChild(row));
+}
+
+// Добавляем поиск по таблице
+document.addEventListener('DOMContentLoaded', function() {
+    // Добавляем поле поиска
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'form-control mb-3';
+    searchInput.placeholder = 'Поиск по сообщениям...';
+    searchInput.id = 'messageSearch';
+    
+    const tableContainer = document.querySelector('.table-responsive');
+    if (tableContainer) {
+        tableContainer.parentNode.insertBefore(searchInput, tableContainer);
+        
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.querySelectorAll('.table tbody tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+    }
+});
 
 // Добавляем авто-обновление каждые 5 минут, если страница открыта
 setInterval(() => {
