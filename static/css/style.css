@@ -38,6 +38,7 @@ body {
     border-radius: var(--border-radius);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     transition: var(--transition);
+    background-color: #fff;
 }
 
 .card:hover {
@@ -46,16 +47,29 @@ body {
 }
 
 .card-header {
-    background-color: #fff;
+    background-color: #f8f9fa;
     border-bottom: 1px solid #e9ecef;
     font-weight: 600;
+    color: #333;
+}
+
+/* Ensure text is visible on cards */
+.card-body {
+    color: #333;
+}
+
+/* Fix text color for specific card contexts */
+.card.text-center h4,
+.card.text-center h5 {
+    color: inherit;
 }
 
 /* Статистические карточки */
 .card.bg-primary,
 .card.bg-success,
 .card.bg-warning,
-.card.bg-info {
+.card.bg-info,
+.card.bg-danger {
     border: none;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
@@ -63,9 +77,24 @@ body {
 .card.bg-primary:hover,
 .card.bg-success:hover,
 .card.bg-warning:hover,
-.card.bg-info:hover {
+.card.bg-info:hover,
+.card.bg-danger:hover {
     transform: translateY(-3px);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Fix white text on colored backgrounds */
+.bg-primary .text-white,
+.bg-success .text-white,
+.bg-info .text-white,
+.bg-warning .text-white,
+.bg-danger .text-white {
+    color: #fff !important;
+}
+
+/* Fix badge colors for better contrast */
+.badge.bg-warning {
+    color: #000 !important;
 }
 
 /* Tables */
@@ -109,6 +138,19 @@ body {
 .badge {
     font-weight: 500;
     border-radius: 12px;
+}
+
+/* Fix badge contrast */
+.badge.bg-warning {
+    color: #000 !important;
+}
+
+.badge.bg-light {
+    color: #000 !important;
+}
+
+.badge.bg-secondary {
+    color: #fff !important;
 }
 
 /* Alerts */
@@ -259,6 +301,115 @@ footer {
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* Message changes page specific styles */
+.message-changes-stats .card {
+    border: 1px solid #e9ecef;
+}
+
+.message-changes-stats .card-body {
+    padding: 0.75rem;
+}
+
+.message-changes-stats h5 {
+    color: #212529;
+    margin-bottom: 0.25rem;
+}
+
+.message-changes-stats small {
+    color: #6c757d;
+}
+
+/* Fix alert colors */
+.alert-info {
+    color: #0c5460;
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+}
+
+.alert-warning {
+    color: #856404;
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+}
+
+.alert-danger {
+    color: #721c24;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+.alert-success {
+    color: #155724;
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+}
+
+/* Ensure icons inherit correct colors */
+.bi {
+    vertical-align: -0.125em;
+}
+
+.card.bg-primary .bi,
+.card.bg-success .bi,
+.card.bg-info .bi,
+.card.bg-danger .bi {
+    color: #fff;
+}
+
+.card.bg-warning .bi {
+    color: #212529;
+}
+
+/* Improve link visibility */
+a {
+    color: var(--telegram-blue);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--telegram-dark-blue);
+    text-decoration: underline;
+}
+
+/* Fix button contrast */
+.btn-outline-primary {
+    color: var(--telegram-blue);
+    border-color: var(--telegram-blue);
+}
+
+.btn-outline-primary:hover {
+    color: #fff;
+    background-color: var(--telegram-blue);
+    border-color: var(--telegram-blue);
+}
+
+/* Ensure proper contrast for text on colored backgrounds */
+.text-primary {
+    color: var(--telegram-blue) !important;
+}
+
+.text-success {
+    color: #198754 !important;
+}
+
+.text-danger {
+    color: #dc3545 !important;
+}
+
+.text-warning {
+    color: #ffc107 !important;
+}
+
+.text-info {
+    color: #0dcaf0 !important;
+}
+
+/* Fix select and input readability */
+select.form-select option {
+    color: #212529;
+    background-color: #fff;
+}
+
 /* Export page styles */
 .export-option {
     border: 2px solid #e9ecef;
@@ -283,6 +434,8 @@ footer {
 .stat-item {
     text-align: center;
     padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: var(--border-radius);
 }
 
 .stat-number {
@@ -296,6 +449,101 @@ footer {
     color: #6c757d;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+/* Fix stat display in colored cards */
+.card.bg-primary .stat-number,
+.card.bg-success .stat-number,
+.card.bg-info .stat-number,
+.card.bg-danger .stat-number {
+    color: #fff !important;
+}
+
+.card.bg-warning .stat-number {
+    color: #000 !important;
+}
+
+.card.bg-primary .stat-label,
+.card.bg-success .stat-label,
+.card.bg-info .stat-label,
+.card.bg-danger .stat-label {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.card.bg-warning .stat-label {
+    color: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Additional color fixes */
+.text-white {
+    color: #fff !important;
+}
+
+.text-dark {
+    color: #212529 !important;
+}
+
+/* Fix Bootstrap card colors */
+.card.bg-primary h4,
+.card.bg-primary h5,
+.card.bg-primary small,
+.card.bg-primary p {
+    color: #fff !important;
+}
+
+.card.bg-success h4,
+.card.bg-success h5,
+.card.bg-success small,
+.card.bg-success p {
+    color: #fff !important;
+}
+
+.card.bg-info h4,
+.card.bg-info h5,
+.card.bg-info small,
+.card.bg-info p {
+    color: #fff !important;
+}
+
+.card.bg-warning h4,
+.card.bg-warning h5,
+.card.bg-warning small,
+.card.bg-warning p {
+    color: #212529 !important;
+}
+
+.card.bg-danger h4,
+.card.bg-danger h5,
+.card.bg-danger small,
+.card.bg-danger p {
+    color: #fff !important;
+}
+
+/* Fix nav links visibility */
+.navbar-dark .navbar-nav .nav-link {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.navbar-dark .navbar-nav .nav-link:hover {
+    color: #fff;
+}
+
+/* Fix form controls */
+.form-control,
+.form-select {
+    color: #212529;
+    background-color: #fff;
+    border-color: #ced4da;
+}
+
+.form-label {
+    color: #212529;
+}
+
+/* Fix table colors */
+.table > :not(caption) > * > * {
+    color: #212529;
+    background-color: transparent;
 }
 
 /* Dark mode support */
@@ -314,12 +562,32 @@ footer {
         color: #ffffff;
     }
     
+    .card-header {
+        background-color: #2d2d2d;
+        color: #ffffff;
+    }
+    
+    .card-body {
+        color: #ffffff;
+    }
+    
     .table {
         color: #ffffff;
     }
     
     .table th {
         background-color: #2d2d2d;
+        color: #ffffff;
+    }
+    
+    .form-control,
+    .form-select {
+        color: #ffffff;
+        background-color: #2d2d2d;
+        border-color: #495057;
+    }
+    
+    .form-label {
         color: #ffffff;
     }
 }

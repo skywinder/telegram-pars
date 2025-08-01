@@ -12,35 +12,35 @@
         
         <!-- Статистика изменений -->
         {% if changes %}
-        <div class="row mb-3">
+        <div class="row mb-3 message-changes-stats">
             <div class="col-md-3">
-                <div class="card text-center">
+                <div class="card text-center bg-light">
                     <div class="card-body p-2">
-                        <h5 class="mb-0">{{ changes|length }}</h5>
+                        <h5 class="mb-0 text-primary">{{ changes|length }}</h5>
                         <small class="text-muted">Всего изменений</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card text-center">
+                <div class="card text-center bg-light">
                     <div class="card-body p-2">
-                        <h5 class="mb-0">{{ changes|selectattr('change_type', 'equalto', 'edited')|list|length }}</h5>
+                        <h5 class="mb-0 text-warning">{{ changes|selectattr('change_type', 'equalto', 'edited')|list|length }}</h5>
                         <small class="text-muted">Редактировано</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card text-center">
+                <div class="card text-center bg-light">
                     <div class="card-body p-2">
-                        <h5 class="mb-0">{{ changes|selectattr('change_type', 'equalto', 'deleted')|list|length }}</h5>
+                        <h5 class="mb-0 text-danger">{{ changes|selectattr('change_type', 'equalto', 'deleted')|list|length }}</h5>
                         <small class="text-muted">Удалено</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card text-center">
+                <div class="card text-center bg-light">
                     <div class="card-body p-2">
-                        <h5 class="mb-0">{{ chats_list|length if chats_list else 0 }}</h5>
+                        <h5 class="mb-0 text-info">{{ chats_list|length if chats_list else 0 }}</h5>
                         <small class="text-muted">Чатов с изменениями</small>
                     </div>
                 </div>
