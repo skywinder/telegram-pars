@@ -25,7 +25,7 @@ TELEGRAM_API_HASH=ваш_api_hash
 PHONE_NUMBER=+7XXXXXXXXXX
 ```
 
-### 3. Запуск
+### 3. Запуск парсера
 ```bash
 source venv/bin/activate  # Windows: venv\Scripts\activate
 python main.py
@@ -36,6 +36,28 @@ python main.py
 - **2** - Парсинг одного чата
 - **3** - Парсинг всех чатов
 - **4** - Аналитика
+
+### 4. Мониторинг и веб-интерфейс
+
+**Простой запуск:**
+```bash
+python run_all.py
+```
+Выберите нужный режим:
+- `1` - Только парсер
+- `2` - Только веб-интерфейс (http://localhost:5001)
+- `3` - Инструкция для запуска всего
+
+**Для опытных пользователей:**
+```bash
+# Вариант 1: Все в одной команде
+./start_monitoring.sh
+
+# Вариант 2: Отдельные терминалы
+python main.py           # Терминал 1: Парсер
+python web_interface.py  # Терминал 2: Веб-интерфейс
+python status_monitor.py # Терминал 3: Монитор (опционально)
+```
 
 ---
 

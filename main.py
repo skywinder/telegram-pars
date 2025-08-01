@@ -572,15 +572,15 @@ async def show_changes_history(analytics: TelegramAnalytics):
 
     input("\nНажми Enter...")
 
-async def show_database_stats(analytics: TelegramAnalytics):
+async def show_database_stats(db: TelegramDatabase):
     """Показывает статистику базы данных"""
-    if not analytics or not analytics.db:
+    if not db:
         print("❌ БД недоступна")
         return
 
     print("\n🗄️ СТАТИСТИКА БАЗЫ ДАННЫХ:")
 
-    stats = analytics.db.get_chat_statistics()
+    stats = db.get_chat_statistics()
 
     if not stats:
         print("📭 Нет данных в базе")
