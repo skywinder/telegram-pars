@@ -11,7 +11,7 @@
 
 **Как использовать:**
 ```bash
-python main_advanced.py
+python main.py
 # Меню → 4 (Аналитика) → 1 (Активные чаты)
 ```
 
@@ -171,14 +171,14 @@ EXPORT_FORMATS = {
 ### Пакетная обработка:
 ```python
 # Анализ всех чатов с фильтрацией
-python main_advanced.py
+python main.py
 # Меню → 3 → подтвердить полный парсинг
 ```
 
 ### Экспорт для конкретного чата:
 ```python
 # Фокус на одном чате
-python main_advanced.py
+python main.py
 # Меню → 2 → выбрать чат → создать ИИ пакет
 ```
 
@@ -187,7 +187,7 @@ python main_advanced.py
 # Запускать периодически для отслеживания
 # Например, еженедельно:
 crontab -e
-0 0 * * 0 cd /path/to/telegram-pars && python main_advanced.py --auto-scan
+0 0 * * 0 cd /path/to/telegram-pars && python main.py --auto-scan
 ```
 
 ## ⚡ Оптимизация производительности
