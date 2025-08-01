@@ -5,6 +5,7 @@
 import os
 import json
 import sqlite3
+import asyncio
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash
 from analytics import TelegramAnalytics
@@ -337,8 +338,17 @@ def message_changes():
             # Получаем все изменения
             edited = db.get_edited_messages(chat_id, limit//2)
             deleted = db.get_deleted_messages(chat_id, limit//2)
+            
+            # Нормализуем поля timestamp для сортировки
+            for msg in edited:
+                msg['timestamp'] = msg.get('last_edit_time', '')
+                msg['change_type'] = 'edited'
+            for msg in deleted:
+                msg['timestamp'] = msg.get('deletion_time', '')
+                msg['change_type'] = 'deleted'
+            
             changes = edited + deleted
-            changes.sort(key=lambda x: x['timestamp'], reverse=True)
+            changes.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
             changes = changes[:limit]
         
         # Получаем список чатов для фильтра
@@ -484,8 +494,17 @@ def api_get_message_changes(chat_id):
         else:
             edited = db.get_edited_messages(chat_id, limit//2)
             deleted = db.get_deleted_messages(chat_id, limit//2)
+            
+            # Нормализуем поля timestamp для сортировки
+            for msg in edited:
+                msg['timestamp'] = msg.get('last_edit_time', '')
+                msg['change_type'] = 'edited'
+            for msg in deleted:
+                msg['timestamp'] = msg.get('deletion_time', '')
+                msg['change_type'] = 'deleted'
+            
             changes = edited + deleted
-            changes.sort(key=lambda x: x['timestamp'], reverse=True)
+            changes.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
             changes = changes[:limit]
         
         return jsonify({
@@ -577,6 +596,36 @@ def api_request_interrupt():
         return jsonify({
             'status': 'error',
             'message': str(e)
+        }), 500
+
+@app.route('/api/check-for-changes', methods=['POST'])
+def api_check_for_changes():
+    """API для проверки новых изменений в сообщениях"""
+    if not active_parser:
+        return jsonify({
+            'success': False,
+            'error': 'Парсер не активен. Запустите парсинг для проверки изменений.'
+        }), 400
+    
+    try:
+        data = request.get_json()
+        chat_id = data.get('chat_id')
+        hours_threshold = data.get('hours_threshold', 24)
+        
+        # Используем метод парсера для проверки изменений
+        changes_result = asyncio.run(active_parser.check_for_changes(
+            chat_id=chat_id,
+            hours_threshold=hours_threshold
+        ))
+        
+        return jsonify({
+            'success': True,
+            'changes_found': changes_result
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
 
 def set_active_parser(parser):

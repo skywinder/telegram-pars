@@ -227,6 +227,32 @@ class TelegramAnalytics:
                 'recent_activity': [dict(row) for row in recent_changes]
             }
 
+    def get_chat_statistics(self, chat_id: int) -> Dict:
+        """
+        Получает статистику для конкретного чата
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            stats = conn.execute('''
+                SELECT
+                    c.id as chat_id,
+                    c.name as chat_name,
+                    c.type as chat_type,
+                    COUNT(m.id) as message_count,
+                    COUNT(DISTINCT m.sender_id) as unique_users,
+                    COUNT(DISTINCT DATE(m.date)) as active_days,
+                    MIN(m.date) as first_message,
+                    MAX(m.date) as last_message,
+                    ROUND(AVG(LENGTH(m.text)), 2) as avg_message_length
+                FROM chats c
+                LEFT JOIN messages m ON c.id = m.chat_id AND m.is_deleted = FALSE
+                WHERE c.id = ?
+                GROUP BY c.id
+            ''', (chat_id,)).fetchone()
+            
+            return dict(stats) if stats else {}
+
     def generate_chat_report(self, chat_id: int) -> Dict:
         """
         Генерирует полный отчет по чату
@@ -247,7 +273,7 @@ class TelegramAnalytics:
                 'chat_info': dict(chat_info),
                 'chat_id': chat_id,
                 'generated_at': datetime.now().isoformat(),
-                'activity_stats': self.get_most_active_chats(limit=1)[0] if self.get_most_active_chats(limit=1) else {},
+                'activity_stats': self.get_chat_statistics(chat_id),
                 'time_analysis': self.get_activity_by_time(chat_id),
                 'topic_analysis': self.analyze_conversation_topics(chat_id),
                 'user_stats': self.get_user_statistics(chat_id),

@@ -7,13 +7,52 @@
     <div class="col-12">
         <h2 class="mb-4">
             <i class="bi bi-pencil-square"></i> Измененные сообщения
+            <small class="text-muted fs-6">Отслеживание изменений и удалений</small>
         </h2>
+        
+        <!-- Статистика изменений -->
+        {% if changes %}
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body p-2">
+                        <h5 class="mb-0">{{ changes|length }}</h5>
+                        <small class="text-muted">Всего изменений</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body p-2">
+                        <h5 class="mb-0">{{ changes|selectattr('change_type', 'equalto', 'edited')|list|length }}</h5>
+                        <small class="text-muted">Редактировано</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body p-2">
+                        <h5 class="mb-0">{{ changes|selectattr('change_type', 'equalto', 'deleted')|list|length }}</h5>
+                        <small class="text-muted">Удалено</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body p-2">
+                        <h5 class="mb-0">{{ chats_list|length if chats_list else 0 }}</h5>
+                        <small class="text-muted">Чатов с изменениями</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Фильтры -->
         <div class="card mb-4">
             <div class="card-body">
                 <form method="get" action="{{ url_for('message_changes') }}" class="row g-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Тип изменения</label>
                         <select name="type" class="form-select" onchange="this.form.submit()">
                             <option value="all" {% if action_type == 'all' %}selected{% endif %}>Все изменения</option>
@@ -21,7 +60,7 @@
                             <option value="deleted" {% if action_type == 'deleted' %}selected{% endif %}>Удаленные</option>
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Чат</label>
                         <select name="chat_id" class="form-select" onchange="this.form.submit()">
                             <option value="">Все чаты</option>
@@ -32,7 +71,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Количество</label>
                         <select name="limit" class="form-select" onchange="this.form.submit()">
                             <option value="50">50</option>
@@ -40,6 +79,14 @@
                             <option value="200">200</option>
                             <option value="500">500</option>
                         </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <div>
+                            <button type="button" class="btn btn-primary w-100" onclick="checkForNewChanges()">
+                                <i class="bi bi-arrow-clockwise"></i> Проверить изменения
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -63,19 +110,26 @@
                         {% for change in changes %}
                             <tr>
                                 <td>
-                                    <small>{{ change.timestamp }}</small>
+                                    {% if change.timestamp %}
+                                        <small title="{{ change.timestamp }}">
+                                            {{ change.timestamp[:19] if change.timestamp|length > 19 else change.timestamp }}
+                                        </small>
+                                    {% else %}
+                                        <small class="text-muted">Нет данных</small>
+                                    {% endif %}
                                 </td>
                                 <td>
-                                    {% if change.action_type == 'edited' %}
+                                    {% if change.change_type == 'edited' or (not change.change_type and change.edit_count) %}
                                         <span class="badge bg-warning">
                                             <i class="bi bi-pencil"></i> Изменено
+                                            {% if change.edit_count %}({{ change.edit_count }}){% endif %}
                                         </span>
-                                    {% elif change.action_type == 'deleted' %}
+                                    {% elif change.change_type == 'deleted' or (not change.change_type and change.deleted_text) %}
                                         <span class="badge bg-danger">
                                             <i class="bi bi-trash"></i> Удалено
                                         </span>
                                     {% else %}
-                                        <span class="badge bg-secondary">{{ change.action_type }}</span>
+                                        <span class="badge bg-secondary">{{ change.change_type or 'Неизвестно' }}</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -95,15 +149,17 @@
                                     </small>
                                 </td>
                                 <td>
-                                    {% if change.action_type == 'edited' %}
+                                    {% if change.change_type == 'edited' or (not change.change_type and change.edit_count) %}
                                         <div class="text-truncate" style="max-width: 400px;">
-                                            <del class="text-muted">{{ change.old_text[:100] }}{% if change.old_text|length > 100 %}...{% endif %}</del>
-                                            <br>
-                                            <span class="text-success">{{ change.new_text[:100] }}{% if change.new_text|length > 100 %}...{% endif %}</span>
+                                            {% if change.current_text %}
+                                                <span class="text-primary">{{ change.current_text[:100] }}{% if change.current_text|length > 100 %}...{% endif %}</span>
+                                            {% else %}
+                                                <em class="text-muted">Текст недоступен</em>
+                                            {% endif %}
                                         </div>
-                                    {% elif change.action_type == 'deleted' %}
+                                    {% elif change.change_type == 'deleted' or (not change.change_type and change.deleted_text) %}
                                         <div class="text-truncate text-muted" style="max-width: 400px;">
-                                            {{ change.text[:100] }}{% if change.text|length > 100 %}...{% endif %}
+                                            <del>{{ (change.deleted_text or change.text or 'Текст недоступен')[:100] }}{% if (change.deleted_text or change.text or '')|length > 100 %}...{% endif %}</del>
                                         </div>
                                     {% endif %}
                                 </td>
@@ -129,26 +185,56 @@
 
 <!-- Скрипт для динамической загрузки изменений -->
 <script>
-function checkForUpdates(chatId) {
-    fetch('/api/check-updates', {
+function checkForNewChanges() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Проверка...';
+    
+    const chatId = document.querySelector('select[name="chat_id"]').value;
+    
+    fetch('/api/check-for-changes', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({chat_id: chatId})
+        body: JSON.stringify({
+            chat_id: chatId ? parseInt(chatId) : null,
+            hours_threshold: 24
+        })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
+            if (data.changes_found && data.changes_found.total_changes > 0) {
+                alert(`Найдено изменений: ${data.changes_found.total_changes}\n` +
+                      `Отредактировано: ${data.changes_found.edited_messages}\n` +
+                      `Удалено: ${data.changes_found.deleted_messages}\n\n` +
+                      `Страница будет обновлена.`);
+                window.location.reload();
+            } else {
+                alert('Новых изменений не найдено');
+            }
         } else {
-            alert('Ошибка: ' + data.error);
+            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Ошибка при запросе обновлений');
+        alert('Ошибка при проверке изменений');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
     });
 }
+
+// Добавляем авто-обновление каждые 5 минут, если страница открыта
+setInterval(() => {
+    const autoRefresh = localStorage.getItem('autoRefreshChanges');
+    if (autoRefresh === 'true') {
+        checkForNewChanges();
+    }
+}, 5 * 60 * 1000);
 </script>
 {% endblock %}
