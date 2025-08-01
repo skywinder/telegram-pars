@@ -115,13 +115,13 @@
                         </ul>
                     </div>
                     <div class="col-md-6">
-                        <h6 class="text-info">🛑 Управление Операциями</h6>
-                        <p class="mb-2">Безопасное прерывание и контроль процессов</p>
+                        <h6 class="text-info">🔍 Мониторинг Изменений</h6>
+                        <p class="mb-2">Отслеживание изменений сообщений в реальном времени</p>
                         <ul class="list-unstyled small">
-                            <li><i class="bi bi-check2 text-success"></i> Изящное прерывание операций</li>
-                            <li><i class="bi bi-check2 text-success"></i> Сохранение прогресса</li>
-                            <li><i class="bi bi-check2 text-success"></i> Автоматическое обновление</li>
-                            <li><i class="bi bi-check2 text-success"></i> История операций</li>
+                            <li><i class="bi bi-check2 text-success"></i> Редактирование сообщений</li>
+                            <li><i class="bi bi-check2 text-success"></i> Удаление сообщений</li>
+                            <li><i class="bi bi-check2 text-success"></i> История изменений</li>
+                            <li><i class="bi bi-check2 text-success"></i> Уведомления в реальном времени</li>
                         </ul>
                     </div>
                 </div>
@@ -133,6 +133,9 @@
                         <button type="button" class="btn btn-outline-info" onclick="openStatusMonitor()">
                             <i class="bi bi-terminal"></i> CLI Мониторинг
                         </button>
+                        <a href="{{ url_for('realtime_monitor_page') }}" class="btn btn-warning">
+                            <i class="bi bi-broadcast"></i> Мониторинг изменений
+                        </a>
                     </div>
                 </div>
             </div>

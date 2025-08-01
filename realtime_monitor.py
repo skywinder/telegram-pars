@@ -10,6 +10,7 @@ from telethon import TelegramClient, events
 from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto
 from database import TelegramDatabase
 import config
+from notification_manager import get_notification_manager
 
 # Настройка логирования
 logger = logging.getLogger('realtime_monitor')

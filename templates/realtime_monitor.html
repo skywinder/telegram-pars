@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+
+{% block title %}Мониторинг изменений - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Заголовок и статус -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1>
+                    <i class="bi bi-broadcast"></i> Мониторинг изменений в реальном времени
+                </h1>
+                <div id="monitor-status" class="badge fs-6">
+                    {% if monitor and monitor.is_running %}
+                        <span class="badge bg-success">
+                            <i class="bi bi-circle-fill"></i> Активен
+                        </span>
+                    {% else %}
+                        <span class="badge bg-secondary">
+                            <i class="bi bi-circle"></i> Неактивен
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Инструкции по использованию -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle"></i> Как отслеживать изменения сообщений
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-primary">📱 Через консоль (CLI)</h6>
+                            <ol class="mb-3">
+                                <li>Запустите <code>python main.py</code></li>
+                                <li>Выберите пункт <strong>10</strong> в главном меню</li>
+                                <li>Запустите мониторинг всех или выбранных чатов</li>
+                                <li>Мониторинг будет работать в фоне, логируя все изменения</li>
+                            </ol>
+                            
+                            <div class="alert alert-light">
+                                <strong>Команды в меню мониторинга:</strong>
+                                <ul class="mb-0">
+                                    <li><code>1</code> - Запустить мониторинг всех чатов</li>
+                                    <li><code>2</code> - Выбрать конкретные чаты</li>
+                                    <li><code>3</code> - Остановить мониторинг</li>
+                                    <li><code>4</code> - Статистика изменений</li>
+                                    <li><code>5</code> - Последние изменения</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h6 class="text-primary">🌐 Через веб-интерфейс</h6>
+                            <ol class="mb-3">
+                                <li>Откройте эту страницу в браузере</li>
+                                <li>Следите за статусом мониторинга вверху страницы</li>
+                                <li>Изменения появляются в реальном времени внизу</li>
+                                <li>Используйте фильтры для поиска нужных изменений</li>
+                            </ol>
+                            
+                            <div class="alert alert-light">
+                                <strong>Возможности веб-интерфейса:</strong>
+                                <ul class="mb-0">
+                                    <li>🔄 Автообновление каждые 10 секунд</li>
+                                    <li>📊 Статистика по типам изменений</li>
+                                    <li>🔍 Фильтрация по чатам и времени</li>
+                                    <li>📱 Детальный просмотр изменений</li>
+                                    <li>📥 Экспорт истории изменений</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-warning mt-3">
+                        <i class="bi bi-exclamation-triangle"></i> 
+                        <strong>Важно:</strong> Для работы мониторинга необходимо запустить парсер через консоль и активировать мониторинг в меню!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Статистика -->
+    {% if stats %}
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center border-primary">
+                <div class="card-body">
+                    <h3 class="text-primary">{{ stats.total_changes }}</h3>
+                    <p class="mb-0">Всего изменений</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center border-success">
+                <div class="card-body">
+                    <h3 class="text-success">{{ stats.changes_24h }}</h3>
+                    <p class="mb-0">За последние 24 часа</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center border-info">
+                <div class="card-body">
+                    <h3 class="text-info">
+                        {% if stats.changes_by_type %}
+                            {{ stats.changes_by_type | selectattr("type", "equalto", "edited") | map(attribute="count") | first | default(0) }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </h3>
+                    <p class="mb-0">Редактирований</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center border-danger">
+                <div class="card-body">
+                    <h3 class="text-danger">
+                        {% if stats.changes_by_type %}
+                            {{ stats.changes_by_type | selectattr("type", "equalto", "deleted") | map(attribute="count") | first | default(0) }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </h3>
+                    <p class="mb-0">Удалений</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Топ чатов по изменениям -->
+    {% if stats.top_chats %}
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-trophy"></i> Топ чатов по изменениям
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        {% for chat in stats.top_chats[:5] %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>{{ chat.name }}</span>
+                            <span class="badge bg-primary rounded-pill">{{ chat.count }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-pie-chart"></i> Распределение по типам
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="changesChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <!-- Фильтры -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label">Период</label>
+            <select class="form-select" id="periodFilter">
+                <option value="1">Последний час</option>
+                <option value="6">Последние 6 часов</option>
+                <option value="24" selected>Последние 24 часа</option>
+                <option value="168">Последняя неделя</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Тип изменения</label>
+            <select class="form-select" id="typeFilter">
+                <option value="">Все типы</option>
+                <option value="edited">Редактирование</option>
+                <option value="deleted">Удаление</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Поиск по чату</label>
+            <input type="text" class="form-control" id="chatFilter" placeholder="Название чата...">
+        </div>
+    </div>
+
+    <!-- Список изменений -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history"></i> Последние изменения
+                        <span id="changesCount" class="badge bg-secondary ms-2">{{ recent_changes|length }}</span>
+                    </h5>
+                    <button class="btn btn-sm btn-primary" onclick="refreshChanges()">
+                        <i class="bi bi-arrow-clockwise"></i> Обновить
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div id="changesList" class="list-group list-group-flush" style="max-height: 600px; overflow-y: auto;">
+                        {% if recent_changes %}
+                            {% for change in recent_changes %}
+                            <div class="list-group-item change-item" 
+                                 data-type="{{ change.action_type }}"
+                                 data-chat="{{ change.chat_name }}"
+                                 data-time="{{ change.detected_at }}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center mb-1">
+                                            {% if change.action_type == 'edited' %}
+                                                <span class="badge bg-warning me-2">
+                                                    <i class="bi bi-pencil"></i> Изменено
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-danger me-2">
+                                                    <i class="bi bi-trash"></i> Удалено
+                                                </span>
+                                            {% endif %}
+                                            <strong>{{ change.chat_name }}</strong>
+                                            <small class="text-muted ms-2">ID: {{ change.message_id }}</small>
+                                        </div>
+                                        
+                                        {% if change.action_type == 'edited' and change.new_content %}
+                                            <p class="mb-1">
+                                                <small class="text-muted">Новый текст:</small><br>
+                                                {{ change.new_content.text[:200] if change.new_content.text else 'Без текста' }}
+                                                {% if change.new_content.text and change.new_content.text|length > 200 %}...{% endif %}
+                                            </p>
+                                        {% endif %}
+                                        
+                                        {% if change.old_content and change.old_content.text %}
+                                            <details class="mt-1">
+                                                <summary class="text-muted" style="cursor: pointer;">
+                                                    <small>Показать старый текст</small>
+                                                </summary>
+                                                <p class="mt-1 mb-0">
+                                                    <small>{{ change.old_content.text[:200] }}{% if change.old_content.text|length > 200 %}...{% endif %}</small>
+                                                </p>
+                                            </details>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-end">
+                                        <small class="text-muted">
+                                            {{ change.detected_at }}
+                                        </small>
+                                        <br>
+                                        <a href="{{ url_for('chat_messages', chat_id=change.chat_id) }}#msg-{{ change.message_id }}" 
+                                           class="btn btn-sm btn-outline-primary mt-1">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center py-5">
+                                <i class="bi bi-inbox fs-1 text-muted"></i>
+                                <p class="text-muted mt-2">Нет изменений за выбранный период</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Автообновление статуса
+setInterval(async function() {
+    try {
+        const response = await fetch('/api/monitor/status');
+        const data = await response.json();
+        
+        const statusEl = document.getElementById('monitor-status');
+        if (data.is_active) {
+            statusEl.innerHTML = `<span class="badge bg-success"><i class="bi bi-circle-fill"></i> Активен</span>`;
+        } else {
+            statusEl.innerHTML = `<span class="badge bg-secondary"><i class="bi bi-circle"></i> Неактивен</span>`;
+        }
+    } catch (error) {
+        console.error('Error updating status:', error);
+    }
+}, 5000);
+
+// Фильтрация изменений
+document.getElementById('typeFilter').addEventListener('change', filterChanges);
+document.getElementById('chatFilter').addEventListener('input', filterChanges);
+
+function filterChanges() {
+    const typeFilter = document.getElementById('typeFilter').value;
+    const chatFilter = document.getElementById('chatFilter').value.toLowerCase();
+    const items = document.querySelectorAll('.change-item');
+    
+    let visibleCount = 0;
+    items.forEach(item => {
+        const type = item.dataset.type;
+        const chat = item.dataset.chat.toLowerCase();
+        
+        const typeMatch = !typeFilter || type === typeFilter;
+        const chatMatch = !chatFilter || chat.includes(chatFilter);
+        
+        if (typeMatch && chatMatch) {
+            item.style.display = '';
+            visibleCount++;
+        } else {
+            item.style.display = 'none';
+        }
+    });
+    
+    document.getElementById('changesCount').textContent = visibleCount;
+}
+
+// Обновление списка изменений
+async function refreshChanges() {
+    const hours = document.getElementById('periodFilter').value;
+    
+    try {
+        const response = await fetch(`/api/monitor/recent-changes?hours=${hours}`);
+        const data = await response.json();
+        
+        if (data.changes) {
+            // Обновляем список (здесь нужно будет реализовать отрисовку)
+            location.reload(); // Пока просто перезагружаем страницу
+        }
+    } catch (error) {
+        console.error('Error refreshing changes:', error);
+    }
+}
+
+// График распределения по типам
+{% if stats and stats.changes_by_type %}
+const ctx = document.getElementById('changesChart').getContext('2d');
+const changesData = {{ stats.changes_by_type | tojson }};
+
+new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: changesData.map(item => item.type === 'edited' ? 'Изменено' : 'Удалено'),
+        datasets: [{
+            data: changesData.map(item => item.count),
+            backgroundColor: [
+                'rgba(255, 193, 7, 0.8)',
+                'rgba(220, 53, 69, 0.8)'
+            ],
+            borderColor: [
+                'rgba(255, 193, 7, 1)',
+                'rgba(220, 53, 69, 1)'
+            ],
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+{% endif %}
+
+// Автообновление изменений каждые 10 секунд
+setInterval(function() {
+    if (document.getElementById('monitor-status').textContent.includes('Активен')) {
+        refreshChanges();
+    }
+}, 10000);
+</script>
+{% endblock %}

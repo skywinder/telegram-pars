@@ -13,6 +13,7 @@ from ai_exporter import AIExporter
 from database import TelegramDatabase
 from status_manager import StatusManager
 import config
+from realtime_monitor import get_monitor_instance
 
 # Создаем Flask приложение
 app = Flask(__name__)
@@ -893,6 +894,57 @@ def not_found(error):
 def internal_error(error):
     """Обработка 500 ошибки"""
     return render_template('500.html'), 500
+
+@app.route('/realtime-monitor')
+def realtime_monitor_page():
+    """Страница мониторинга изменений в реальном времени"""
+    monitor = get_monitor_instance()
+    
+    # Получаем статистику если монитор активен
+    if monitor:
+        stats = asyncio.run(monitor.get_statistics())
+        recent_changes = asyncio.run(monitor.get_recent_changes(hours=24))
+    else:
+        stats = None
+        recent_changes = []
+    
+    return render_template('realtime_monitor.html', 
+                         monitor=monitor,
+                         stats=stats,
+                         recent_changes=recent_changes)
+
+@app.route('/api/monitor/status')
+def api_monitor_status():
+    """API для получения статуса мониторинга"""
+    monitor = get_monitor_instance()
+    
+    if not monitor:
+        return jsonify({
+            'is_active': False,
+            'message': 'Монитор не инициализирован'
+        })
+    
+    return jsonify({
+        'is_active': monitor.is_running,
+        'monitored_chats': len(monitor.monitored_chats) if monitor.monitored_chats else 'all'
+    })
+
+@app.route('/api/monitor/recent-changes')
+def api_monitor_recent_changes():
+    """API для получения последних изменений"""
+    monitor = get_monitor_instance()
+    
+    if not monitor:
+        return jsonify({'error': 'Монитор не инициализирован'}), 404
+    
+    hours = request.args.get('hours', 24, type=int)
+    chat_id = request.args.get('chat_id', type=int)
+    
+    try:
+        changes = asyncio.run(monitor.get_recent_changes(hours=hours, chat_id=chat_id))
+        return jsonify({'changes': changes})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     print("🌐 Запуск веб-интерфейса Telegram Parser...")
