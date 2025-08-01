@@ -245,7 +245,7 @@
                         {% for chat in changes_summary.most_active_chats[:3] %}
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <small>{{ chat.chat_name[:20] }}{% if chat.chat_name|length > 20 %}...{% endif %}</small>
-                                <small class="text-muted">{{ chat.changes_count }} изм.</small>
+                                <small class="text-muted">{{ chat.total_changes }} изм.</small>
                             </div>
                         {% endfor %}
                     {% endif %}

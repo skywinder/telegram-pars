@@ -292,14 +292,37 @@ class TelegramParser:
     async def _parse_new_messages_since(self, chat_id: int, since_date: datetime, session_id: str = None) -> List[Dict]:
         """Парсит только новые сообщения с указанной даты"""
         print(f"🔄 Парсим новые сообщения с {since_date.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Обновляем статус с детальной информацией
+        self.update_status(
+            operation='parsing_new_messages',
+            progress_update={
+                'current_chat_messages': 0,
+                'current_chat_messages_processed': 0,
+                'parsing_phase': 'Поиск новых сообщений'
+            }
+        )
 
         messages = []
         current_message_ids = []
         new_count = 0
+        total_checked = 0
 
         try:
             async for message in self.client.iter_messages(chat_id, offset_date=since_date):
                 if isinstance(message, Message):
+                    total_checked += 1
+                    
+                    # Обновляем статус каждые 10 сообщений
+                    if total_checked % 10 == 0:
+                        self.update_status(
+                            progress_update={
+                                'current_chat_messages_processed': total_checked,
+                                'new_messages_found': new_count,
+                                'parsing_phase': f'Проверено {total_checked} сообщений, найдено {new_count} новых'
+                            }
+                        )
+                    
                     # Добавляем задержку для соблюдения лимитов
                     await asyncio.sleep(self.rate_limits.get('delay_between_requests', 0.5))
 
@@ -331,7 +354,16 @@ class TelegramParser:
             print(f"❌ Ошибка при парсинге новых сообщений: {e}")
             self.session_stats['errors'] += 1
 
-        print(f"✅ Найдено {new_count} новых сообщений")
+        print(f"✅ Найдено {new_count} новых сообщений из {total_checked} проверенных")
+        
+        # Финальное обновление статуса
+        self.update_status(
+            progress_update={
+                'parsing_phase': f'Завершено: {new_count} новых из {total_checked} проверенных',
+                'messages_saved': self.session_stats.get('messages_saved', 0) + new_count
+            }
+        )
+        
         return messages
 
     async def _parse_all_messages(self, chat_id: int, limit: int = None, session_id: str = None) -> List[Dict]:
@@ -340,13 +372,35 @@ class TelegramParser:
             limit = config.MAX_MESSAGES
 
         print(f"💬 Полное сканирование чата {chat_id} (лимит: {limit or 'все'})")
+        
+        # Обновляем статус
+        self.update_status(
+            operation='parsing_full_chat',
+            progress_update={
+                'current_chat_messages': limit or 'all',
+                'current_chat_messages_processed': 0,
+                'parsing_phase': 'Начало полного сканирования'
+            }
+        )
 
         messages = []
         current_message_ids = []
 
         try:
+            message_count = 0
             async for message in self.client.iter_messages(chat_id, limit=limit):
                 if isinstance(message, Message):
+                    message_count += 1
+                    
+                    # Обновляем статус каждые 10 сообщений
+                    if message_count % 10 == 0:
+                        self.update_status(
+                            progress_update={
+                                'current_chat_messages_processed': message_count,
+                                'parsing_phase': f'Обработано {message_count} сообщений'
+                            }
+                        )
+                    
                     # Добавляем задержку для соблюдения лимитов
                     await asyncio.sleep(self.rate_limits.get('delay_between_requests', 0.5))
 
@@ -372,6 +426,9 @@ class TelegramParser:
                     # Сохраняем в БД с отслеживанием изменений
                     if self.db and session_id:
                         self.db.save_message_with_history(message_data, session_id)
+                        
+                    # Обновляем статистику сессии
+                    self.session_stats['messages_saved'] = self.session_stats.get('messages_saved', 0) + 1
 
             # Помечаем удаленные сообщения
             if self.db and session_id:
@@ -516,8 +573,16 @@ class TelegramParser:
 
             # Обновляем статус текущего чата
             self.update_status(
-                chat_info=chat,
-                progress_update={'processed_chats': i-1}
+                chat_info={
+                    'id': chat['id'],
+                    'name': chat['name'],
+                    'type': chat['type']
+                },
+                progress_update={
+                    'processed_chats': i - 1,
+                    'current_chat_number': i,
+                    'parsing_phase': f'Парсинг чата {i}/{len(chats)}: {chat["name"]}'
+                }
             )
 
             print(f"\n📊 Прогресс: {i}/{len(chats)} - Обрабатываем '{chat['name']}'")

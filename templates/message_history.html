@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}История сообщения #{{ message_id }} - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="bi bi-clock-history"></i> История изменений сообщения
+        </h2>
+
+        <!-- Информация о сообщении -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    Сообщение #{{ message_id }}
+                    {% if chat_info %}
+                        в чате "{{ chat_info.name }}"
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if history %}
+                    {% set first_record = history[0] %}
+                    <p class="mb-2">
+                        <strong>Автор:</strong> 
+                        {% if first_record.first_name %}
+                            {{ first_record.first_name }} {{ first_record.last_name or '' }}
+                        {% elif first_record.username %}
+                            @{{ first_record.username }}
+                        {% else %}
+                            User {{ first_record.sender_id }}
+                        {% endif %}
+                    </p>
+                    <p class="mb-0">
+                        <strong>Всего изменений:</strong> {{ history|length }}
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Timeline изменений -->
+        <div class="timeline">
+            {% for record in history %}
+                <div class="card mb-3 {% if record.action_type == 'deleted' %}border-danger{% elif record.action_type == 'edited' %}border-warning{% else %}border-success{% endif %}">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                {% if record.action_type == 'created' %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-plus-circle"></i> Создано
+                                    </span>
+                                {% elif record.action_type == 'edited' %}
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-pencil"></i> Изменено
+                                    </span>
+                                {% elif record.action_type == 'deleted' %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-trash"></i> Удалено
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <small class="text-muted">
+                                {{ record.timestamp }}
+                                {% if record.scan_session %}
+                                    | Сессия: {{ record.scan_session[:8] }}...
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if record.action_type == 'created' %}
+                            <div class="alert alert-success mb-0">
+                                <strong>Новое сообщение:</strong>
+                                <p class="mb-0 mt-2">{{ record.new_text }}</p>
+                            </div>
+                        {% elif record.action_type == 'edited' %}
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="alert alert-light">
+                                        <strong>Было:</strong>
+                                        <p class="mb-0 mt-2 text-muted">
+                                            <del>{{ record.old_text }}</del>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="alert alert-warning">
+                                        <strong>Стало:</strong>
+                                        <p class="mb-0 mt-2">{{ record.new_text }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Визуальное сравнение -->
+                            <div class="mt-3">
+                                <button class="btn btn-sm btn-outline-primary" 
+                                        onclick="showDiff('{{ record.id }}', '{{ record.old_text|e }}', '{{ record.new_text|e }}')">
+                                    <i class="bi bi-file-earmark-diff"></i> Показать различия
+                                </button>
+                            </div>
+                            <div id="diff-{{ record.id }}" class="mt-3" style="display: none;"></div>
+                        {% elif record.action_type == 'deleted' %}
+                            <div class="alert alert-danger mb-0">
+                                <strong>Удаленное сообщение:</strong>
+                                <p class="mb-0 mt-2">
+                                    <del>{{ record.old_text }}</del>
+                                </p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="mt-4">
+            <a href="{{ url_for('chat_messages', chat_id=chat_id) }}" class="btn btn-primary">
+                <i class="bi bi-chat-dots"></i> К сообщениям чата
+            </a>
+            <a href="{{ url_for('message_changes') }}" class="btn btn-secondary">
+                <i class="bi bi-list"></i> К списку изменений
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Подключаем библиотеку для сравнения текста -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
+
+<script>
+function showDiff(recordId, oldText, newText) {
+    const diffDiv = document.getElementById('diff-' + recordId);
+    
+    if (diffDiv.style.display === 'none') {
+        // Декодируем HTML entities
+        const parser = new DOMParser();
+        oldText = parser.parseFromString(oldText, 'text/html').body.textContent || "";
+        newText = parser.parseFromString(newText, 'text/html').body.textContent || "";
+        
+        // Создаем diff
+        const dmp = new diff_match_patch();
+        const diff = dmp.diff_main(oldText, newText);
+        dmp.diff_cleanupSemantic(diff);
+        
+        // Преобразуем в HTML
+        let html = '';
+        diff.forEach(function(part) {
+            const type = part[0];
+            const text = part[1];
+            if (type === -1) {
+                html += '<span style="background-color: #ffcccc; text-decoration: line-through;">' + 
+                        escapeHtml(text) + '</span>';
+            } else if (type === 1) {
+                html += '<span style="background-color: #ccffcc;">' + 
+                        escapeHtml(text) + '</span>';
+            } else {
+                html += escapeHtml(text);
+            }
+        });
+        
+        diffDiv.innerHTML = '<div class="alert alert-info"><strong>Изменения:</strong><br>' + html + '</div>';
+        diffDiv.style.display = 'block';
+    } else {
+        diffDiv.style.display = 'none';
+    }
+}
+
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+</script>
+
+<style>
+.timeline .card {
+    position: relative;
+    margin-left: 20px;
+}
+
+.timeline .card::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #007bff;
+}
+
+.timeline .card.border-success::before {
+    background-color: #28a745;
+}
+
+.timeline .card.border-warning::before {
+    background-color: #ffc107;
+}
+
+.timeline .card.border-danger::before {
+    background-color: #dc3545;
+}
+</style>
+{% endblock %}

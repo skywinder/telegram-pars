@@ -170,7 +170,11 @@ async def parse_single_chat(parser: TelegramParser, exporter: DataExporter):
                 limit = config.MAX_MESSAGES
 
             print(f"\n🚀 Парсим чат '{selected_chat['name']}'...")
-            print("💡 Нажми Ctrl+C в любой момент для остановки парсинга")
+            print("\n⚙️  УПРАВЛЕНИЕ ПАРСИНГОМ:")
+            print("   💡 Нажми Ctrl+C для остановки парсинга")
+            print("   📊 Статус обновляется каждую секунду")
+            print("   ⏸️  При остановке данные будут сохранены")
+            print("─" * 50)
 
             # Создаем сессию если есть БД
             session_id = None
@@ -205,16 +209,15 @@ async def parse_single_chat(parser: TelegramParser, exporter: DataExporter):
                 # Экспортируем
                 exported_files = exporter.export_all_formats(export_data)
 
-                # Предлагаем создать AI экспорт
-                if parser.db:
-                    create_ai = input("\n🤖 Создать файлы для AI анализа? (y/N): ").strip().lower()
-                    if create_ai in ['y', 'yes', 'да', 'д']:
-                        ai_exp = AIExporter(parser.db.db_path)
-                        ai_files = ai_exp.create_complete_ai_package(selected_chat['id'])
-                        print("✅ AI файлы созданы!")
+                # Создаем AI экспорт если включено в настройках
+                if parser.db and config.AUTO_CREATE_AI_ANALYSIS:
+                    print("\n🤖 Создаем AI анализ...")
+                    ai_exp = AIExporter(parser.db.db_path)
+                    ai_files = ai_exp.create_complete_ai_package(selected_chat['id'])
+                    print("✅ AI анализ создан автоматически!")
 
             except KeyboardInterrupt:
-                print("\n⏹️ Остановка парсинга...")
+                print("\n\n⏹️ Остановка парсинга...")
                 parser.request_interruption()
 
                 # Ждем завершения
@@ -223,7 +226,22 @@ async def parse_single_chat(parser: TelegramParser, exporter: DataExporter):
                 except asyncio.TimeoutError:
                     monitor_task.cancel()
 
-                print("✅ Парсинг остановлен. Данные сохранены.")
+                # Показываем финальную статистику
+                final_status = parser.get_current_status()
+                print("\n✅ ПАРСИНГ ОСТАНОВЛЕН")
+                print("─" * 50)
+                
+                if final_status['progress']['processed_chats'] > 0:
+                    print(f"📁 Обработано чатов: {final_status['progress']['processed_chats']}")
+                
+                api_stats = parser.get_session_statistics()
+                if api_stats:
+                    print(f"📡 Всего API запросов: {api_stats['total_requests']}")
+                    if api_stats['messages_saved']:
+                        print(f"💬 Сохранено сообщений: {api_stats['messages_saved']}")
+                
+                print("💾 Все данные сохранены")
+                print("─" * 50)
                 return
 
         else:
@@ -247,7 +265,12 @@ async def parse_all_chats(parser: TelegramParser, exporter: DataExporter):
         print("❌ Отменено")
         return
 
-    print("💡 Нажми Ctrl+C в любой момент для остановки парсинга")
+    print("\n⚙️  УПРАВЛЕНИЕ ПАРСИНГОМ:")
+    print("   💡 Нажми Ctrl+C для остановки")
+    print("   📊 Статус обновляется в реальном времени")
+    print("   ⏸️  При остановке все данные сохранятся")
+    print("   📱 Также доступен веб-интерфейс мониторинга (status_monitor.py)")
+    print("─" * 50)
 
     # Запускаем мониторинг статуса в фоне
     monitor_task = asyncio.create_task(monitor_parsing_status(parser))
@@ -271,16 +294,15 @@ async def parse_all_chats(parser: TelegramParser, exporter: DataExporter):
             for change_type in changes.get('changes_by_type', []):
                 print(f"  {change_type['action_type']}: {change_type['count']} изменений")
 
-        # Предлагаем создать AI анализ
-        if parser.db:
-            create_ai = input("\n🤖 Создать общий AI анализ? (y/N): ").strip().lower()
-            if create_ai in ['y', 'yes', 'да', 'д']:
-                ai_exp = AIExporter(parser.db.db_path)
-                ai_files = ai_exp.create_complete_ai_package()
-                print("✅ AI анализ создан!")
+        # Создаем AI анализ если включено в настройках
+        if parser.db and config.AUTO_CREATE_AI_ANALYSIS:
+            print("\n🤖 Создаем общий AI анализ...")
+            ai_exp = AIExporter(parser.db.db_path)
+            ai_files = ai_exp.create_complete_ai_package()
+            print("✅ AI анализ создан автоматически!")
 
     except KeyboardInterrupt:
-        print("\n⏹️ Остановка парсинга...")
+        print("\n\n⏹️ Остановка парсинга...")
         parser.request_interruption()
 
         # Ждем завершения
@@ -289,7 +311,29 @@ async def parse_all_chats(parser: TelegramParser, exporter: DataExporter):
         except asyncio.TimeoutError:
             monitor_task.cancel()
 
-        print("✅ Парсинг остановлен. Данные сохранены.")
+        # Показываем финальную статистику
+        final_status = parser.get_current_status()
+        print("\n✅ ПАРСИНГ ОСТАНОВЛЕН")
+        print("─" * 50)
+        
+        if final_status['progress']['total_chats'] > 0:
+            processed = final_status['progress']['processed_chats']
+            total = final_status['progress']['total_chats']
+            print(f"📁 Обработано чатов: {processed}/{total} ({(processed/total*100):.1f}%)")
+        
+        api_stats = parser.get_session_statistics()
+        if api_stats:
+            print(f"📡 Всего API запросов: {api_stats['total_requests']}")
+            if api_stats['messages_saved']:
+                print(f"💬 Сохранено сообщений: {api_stats['messages_saved']}")
+            
+            # Время работы
+            if api_stats['start_time']:
+                duration = datetime.now() - api_stats['start_time']
+                print(f"⏱️ Время работы: {str(duration).split('.')[0]}")
+        
+        print("💾 Все данные сохранены")
+        print("─" * 50)
         return
 
     except Exception as e:
@@ -426,15 +470,23 @@ async def show_conversation_starters(analytics: TelegramAnalytics):
     """Показывает кто чаще начинает диалоги"""
     print("\n💬 АНАЛИЗ ИНИЦИАЦИИ ДИАЛОГОВ:")
 
-    chat_id = input("ID чата (Enter для всех чатов): ").strip()
-    if chat_id:
-        try:
-            chat_id = int(chat_id)
-        except ValueError:
-            print("❌ Неверный ID чата")
-            return
-    else:
+    use_all = input("Анализировать все чаты? (y/N): ").strip().lower()
+    
+    if use_all in ['y', 'yes', 'да', 'д']:
         chat_id = None
+    else:
+        # Используем интерактивный выбор чата
+        from telegram_parser import TelegramParser
+        parser = TelegramParser()
+        await parser.initialize()
+        
+        selected_chat = await select_chat_interactive(parser, "Выбери чат для анализа")
+        await parser.close()
+        
+        if not selected_chat:
+            return
+        
+        chat_id = selected_chat['id']
 
     analysis = analytics.analyze_conversation_starters(chat_id)
 
@@ -458,15 +510,23 @@ async def show_emoji_analysis(analytics: TelegramAnalytics):
     """Показывает анализ эмодзи и смайликов"""
     print("\n😀 АНАЛИЗ ЭМОДЗИ И СМАЙЛИКОВ:")
 
-    chat_id = input("ID чата (Enter для всех чатов): ").strip()
-    if chat_id:
-        try:
-            chat_id = int(chat_id)
-        except ValueError:
-            print("❌ Неверный ID чата")
-            return
-    else:
+    use_all = input("Анализировать все чаты? (y/N): ").strip().lower()
+    
+    if use_all in ['y', 'yes', 'да', 'д']:
         chat_id = None
+    else:
+        # Используем интерактивный выбор чата
+        from telegram_parser import TelegramParser
+        parser = TelegramParser()
+        await parser.initialize()
+        
+        selected_chat = await select_chat_interactive(parser, "Выбери чат для анализа")
+        await parser.close()
+        
+        if not selected_chat:
+            return
+        
+        chat_id = selected_chat['id']
 
     analysis = analytics.analyze_emoji_and_expressions(chat_id)
 
@@ -500,12 +560,65 @@ async def show_emoji_analysis(analytics: TelegramAnalytics):
 
     input("\nНажми Enter...")
 
+async def select_chat_interactive(parser: TelegramParser, prompt: str = "Выбери чат") -> dict:
+    """Интерактивный выбор чата с отображением списка"""
+    chats = await parser.get_chats_list()
+    
+    if not chats:
+        print("❌ Нет доступных чатов")
+        return None
+    
+    print(f"\n📋 ДОСТУПНЫЕ ЧАТЫ:")
+    print("-" * 80)
+    print(f"{'№':>3} {'Название':30} {'ID':15} {'Тип':15} {'Сообщений':>10}")
+    print("-" * 80)
+    
+    # Показываем до 20 чатов для удобства выбора
+    display_limit = min(20, len(chats))
+    for i, chat in enumerate(chats[:display_limit], 1):
+        name = chat['name'][:28] + '..' if len(chat['name']) > 30 else chat['name']
+        msg_count = chat.get('message_count', 'N/A')
+        print(f"{i:>3}. {name:30} {str(chat['id']):15} {chat['type']:15} {str(msg_count):>10}")
+    
+    if len(chats) > display_limit:
+        print(f"\n... и еще {len(chats) - display_limit} чатов")
+    
+    print("\n💡 Введи номер чата (1-{}) или ID чата напрямую".format(display_limit))
+    choice = input(f"👉 {prompt}: ").strip()
+    
+    try:
+        # Проверяем, ввел ли пользователь номер из списка
+        choice_num = int(choice)
+        if 1 <= choice_num <= display_limit:
+            return chats[choice_num - 1]
+        else:
+            # Возможно это ID чата
+            for chat in chats:
+                if chat['id'] == choice_num:
+                    return chat
+            print("❌ Чат с таким ID не найден")
+            return None
+    except ValueError:
+        print("❌ Неверный ввод")
+        return None
+
 async def show_chat_report(analytics: TelegramAnalytics):
     """Показывает полный отчет по чату"""
     print("\n📊 ПОЛНЫЙ ОТЧЕТ ПО ЧАТУ:")
 
+    # Используем интерактивный выбор чата
+    from telegram_parser import TelegramParser
+    parser = TelegramParser()
+    await parser.initialize()
+    
+    selected_chat = await select_chat_interactive(parser, "Выбери чат для отчета")
+    await parser.close()
+    
+    if not selected_chat:
+        return
+
     try:
-        chat_id = int(input("Введи ID чата: "))
+        chat_id = selected_chat['id']
         report = analytics.generate_chat_report(chat_id)
 
         if 'error' in report:
@@ -563,36 +676,57 @@ async def ai_export_menu(ai_exporter: AIExporter, analytics: TelegramAnalytics):
             print("✅ Обзор создан!")
 
         elif choice == "2":
-            try:
-                chat_id = int(input("ID чата: "))
-                ai_exporter.create_chat_analysis_file(chat_id)
+            # Используем интерактивный выбор чата
+            from telegram_parser import TelegramParser
+            parser = TelegramParser()
+            await parser.initialize()
+            
+            selected_chat = await select_chat_interactive(parser, "Выбери чат для AI анализа")
+            await parser.close()
+            
+            if selected_chat:
+                ai_exporter.create_chat_analysis_file(selected_chat['id'])
                 print("✅ Анализ чата создан!")
-            except ValueError:
-                print("❌ Неверный ID")
 
         elif choice == "3":
             ai_exporter.create_topic_analysis_file()
             print("✅ Анализ тем создан!")
 
         elif choice == "4":
-            try:
-                chat_id = int(input("ID чата: "))
-                days = int(input("За сколько дней (по умолчанию 7): ") or "7")
-                ai_exporter.create_conversation_snippet(chat_id, days)
-                print("✅ Фрагмент создан!")
-            except ValueError:
-                print("❌ Неверные параметры")
+            # Используем интерактивный выбор чата
+            from telegram_parser import TelegramParser
+            parser = TelegramParser()
+            await parser.initialize()
+            
+            selected_chat = await select_chat_interactive(parser, "Выбери чат для фрагмента")
+            await parser.close()
+            
+            if selected_chat:
+                try:
+                    days = int(input("За сколько дней (по умолчанию 7): ") or "7")
+                    ai_exporter.create_conversation_snippet(selected_chat['id'], days)
+                    print("✅ Фрагмент создан!")
+                except ValueError:
+                    print("❌ Неверное количество дней")
 
         elif choice == "5":
-            chat_id = input("ID чата (Enter для общего анализа): ").strip()
-            if chat_id:
-                try:
-                    chat_id = int(chat_id)
-                except ValueError:
-                    print("❌ Неверный ID")
-                    continue
-            else:
+            use_all = input("Создать общий анализ всех чатов? (y/N): ").strip().lower()
+            
+            if use_all in ['y', 'yes', 'да', 'д']:
                 chat_id = None
+            else:
+                # Используем интерактивный выбор чата
+                from telegram_parser import TelegramParser
+                parser = TelegramParser()
+                await parser.initialize()
+                
+                selected_chat = await select_chat_interactive(parser, "Выбери чат для полного пакета")
+                await parser.close()
+                
+                if not selected_chat:
+                    continue
+                
+                chat_id = selected_chat['id']
 
             ai_exporter.create_complete_ai_package(chat_id)
             print("✅ Полный пакет создан!")
@@ -636,17 +770,35 @@ async def monitor_parsing_status(parser: TelegramParser):
             status = parser.get_current_status()
 
             # Показываем статус если он изменился или сменился чат
-            current_chat_id = status.get('current_chat_id')
+            current_chat_id = status.get('current_chat', {}).get('id') if isinstance(status.get('current_chat'), dict) else None
+            
             if status != last_status or current_chat_id != last_chat_id:
                 if status['is_active']:
                     operation = status['current_operation'] or 'Парсинг'
-                    chat_name = status['current_chat'] or 'Неизвестный чат'
+                    
+                    # Получаем информацию о чате
+                    chat_info = status.get('current_chat', {})
+                    if isinstance(chat_info, dict):
+                        chat_name = chat_info.get('name', 'Неизвестный чат')
+                    else:
+                        chat_name = str(chat_info) if chat_info else 'Неизвестный чат'
 
-                    # Очищаем предыдущие строки для обновления прогресса
-                    print("\033[2K\r", end='')  # Очищаем текущую строку
+                    # Очищаем экран для обновления
+                    print("\033[H\033[J", end='')  # Очищаем экран
+                    
+                    # Заголовок
+                    print("=" * 60)
+                    print(f"📊 МОНИТОРИНГ ПАРСИНГА TELEGRAM")
+                    print("=" * 60)
                     
                     # Основная информация
-                    print(f"\n📊 {operation}: {chat_name}")
+                    print(f"\n🔄 Операция: {operation}")
+                    print(f"💬 Текущий чат: {chat_name}")
+                    
+                    # Фаза парсинга
+                    parsing_phase = status['progress'].get('parsing_phase', '')
+                    if parsing_phase:
+                        print(f"📋 Фаза: {parsing_phase}")
 
                     # Прогресс по чатам
                     if status['progress']['total_chats'] > 0:
@@ -655,45 +807,61 @@ async def monitor_parsing_status(parser: TelegramParser):
                         progress = (processed / total) * 100
                         
                         # Визуальный прогресс-бар
-                        bar_length = 30
+                        bar_length = 40
                         filled_length = int(bar_length * processed // total)
                         bar = '█' * filled_length + '░' * (bar_length - filled_length)
                         
-                        print(f"   📈 Прогресс: [{bar}] {progress:.1f}%")
-                        print(f"   📁 Обработано: {processed}/{total} чатов")
+                        print(f"\n📈 Общий прогресс:")
+                        print(f"   [{bar}] {progress:.1f}%")
+                        print(f"   Обработано: {processed}/{total} чатов")
 
                     # Прогресс по сообщениям в текущем чате
-                    if 'current_chat_messages' in status['progress']:
+                    if 'current_chat_messages_processed' in status['progress']:
                         msg_processed = status['progress'].get('current_chat_messages_processed', 0)
                         msg_total = status['progress'].get('current_chat_messages', 0)
-                        if msg_total > 0:
+                        
+                        print(f"\n💬 Текущий чат:")
+                        if isinstance(msg_total, int) and msg_total > 0:
                             msg_progress = (msg_processed / msg_total) * 100
-                            print(f"   💬 Сообщения в чате: {msg_processed}/{msg_total} ({msg_progress:.1f}%)")
+                            print(f"   Сообщений: {msg_processed}/{msg_total} ({msg_progress:.1f}%)")
+                        else:
+                            print(f"   Обработано сообщений: {msg_processed}")
+                        
+                        # Новые сообщения
+                        new_found = status['progress'].get('new_messages_found', 0)
+                        if new_found > 0:
+                            print(f"   ✨ Найдено новых: {new_found}")
 
-                    # Время
+                    # Время и скорость
                     elapsed_time = datetime.now() - start_time
-                    print(f"   ⏱️ Прошло времени: {str(elapsed_time).split('.')[0]}")
+                    print(f"\n⏱️ Время работы: {str(elapsed_time).split('.')[0]}")
                     
-                    if status['progress']['estimated_time_remaining']:
-                        print(f"   ⏳ Осталось примерно: {status['progress']['estimated_time_remaining']}")
+                    if status['progress'].get('estimated_time_remaining'):
+                        print(f"⏳ Осталось примерно: {status['progress']['estimated_time_remaining']}")
 
                     # Статистика API
                     api_stats = parser.get_session_statistics()
                     if api_stats:
-                        print(f"   📡 API: {api_stats['total_requests']} запросов", end='')
+                        print(f"\n📡 Статистика API:")
+                        print(f"   Запросов: {api_stats['total_requests']}")
+                        
+                        if api_stats.get('messages_saved', 0) > 0:
+                            print(f"   Сохранено сообщений: {api_stats['messages_saved']}")
+                        
                         if api_stats['flood_waits'] > 0:
-                            print(f", {api_stats['flood_waits']} FloodWait", end='')
+                            print(f"   ⚠️ FloodWait ошибок: {api_stats['flood_waits']}")
                         if api_stats['errors'] > 0:
-                            print(f", {api_stats['errors']} ошибок", end='')
-                        print()
+                            print(f"   ❌ Других ошибок: {api_stats['errors']}")
 
-                    # Скорость обработки
-                    if api_stats and api_stats['total_requests'] > 0 and elapsed_time.total_seconds() > 0:
-                        speed = api_stats['total_requests'] / elapsed_time.total_seconds()
-                        print(f"   ⚡ Скорость: {speed:.1f} запросов/сек")
+                        # Скорость обработки
+                        if api_stats['total_requests'] > 0 and elapsed_time.total_seconds() > 0:
+                            speed = api_stats['total_requests'] / elapsed_time.total_seconds()
+                            msg_speed = api_stats.get('messages_saved', 0) / elapsed_time.total_seconds() * 60
+                            print(f"   ⚡ Скорость: {speed:.1f} запросов/сек")
+                            print(f"   📨 Сообщений в минуту: {msg_speed:.0f}")
 
                     print(f"\n💡 Для остановки нажмите Ctrl+C")
-                    print("─" * 50)
+                    print("─" * 60)
 
                 last_status = status
                 last_chat_id = current_chat_id
@@ -704,7 +872,7 @@ async def monitor_parsing_status(parser: TelegramParser):
                 print("⏳ Завершаем обработку текущего чата...")
                 break
 
-            await asyncio.sleep(1)  # Обновляем каждую секунду для лучшей отзывчивости
+            await asyncio.sleep(1)  # Обновляем каждую секунду
 
         except asyncio.CancelledError:
             break
@@ -782,12 +950,14 @@ async def show_settings_menu():
     print(f"📊 Максимум сообщений: {config.MAX_MESSAGES}")
     print(f"📁 Папка результатов: {config.OUTPUT_DIR}")
     print(f"🗄️ Отслеживание истории: {'Включено' if config.ENABLE_HISTORY_TRACKING else 'Выключено'}")
+    print(f"🤖 Автоматический AI анализ: {'Включен' if config.AUTO_CREATE_AI_ANALYSIS else 'Выключен'}")
 
     print("\nФорматы экспорта:")
     for fmt, enabled in config.EXPORT_FORMATS.items():
         status = "✅" if enabled else "❌"
         print(f"  {status} {fmt}")
 
+    print("\n💡 Для изменения настроек отредактируйте config.py")
     input("\nНажми Enter...")
 
 def check_python_version():

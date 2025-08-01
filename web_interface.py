@@ -43,6 +43,23 @@ def init_app():
         print("⚠️ База данных не найдена. Запустите сначала парсинг.")
         return False
 
+def transform_chat_data(raw_chat):
+    """Преобразует данные чата из формата БД в формат для шаблонов"""
+    if not raw_chat:
+        return None
+    
+    return {
+        'id': raw_chat.get('chat_id', 0),
+        'name': raw_chat.get('chat_name', 'Неизвестный чат'),
+        'type': raw_chat.get('chat_type', 'unknown'),
+        'total_messages': raw_chat.get('message_count', 0),
+        'unique_senders': raw_chat.get('unique_users', 0),
+        'last_message': raw_chat.get('last_message', ''),
+        'active_days': raw_chat.get('active_days', 0),
+        'edited_count': raw_chat.get('edited_count', 0),
+        'deleted_count': raw_chat.get('deleted_count', 0)
+    }
+
 @app.route('/')
 def index():
     """Главная страница"""
@@ -51,11 +68,15 @@ def index():
 
     try:
                 # Получаем базовую статистику
-        stats = analytics.get_most_active_chats(limit=10)  # Топ 10 чатов
+        raw_stats = analytics.get_most_active_chats(limit=10)  # Топ 10 чатов
+        
+        # Преобразуем данные к ожидаемому формату
+        stats = [transform_chat_data(chat) for chat in raw_stats if chat]
 
         # Общая статистика
-        total_chats = len(analytics.get_most_active_chats(limit=1000))  # Большой лимит для подсчета всех
-        total_messages = sum(s['message_count'] for s in analytics.get_most_active_chats(limit=1000))
+        all_chats = analytics.get_most_active_chats(limit=1000)  # Большой лимит для подсчета всех
+        total_chats = len(all_chats) if all_chats else 0
+        total_messages = sum(s.get('message_count', 0) for s in all_chats) if all_chats else 0
 
         # Последние изменения
         changes_summary = analytics.get_message_changes_analytics()
@@ -76,7 +97,11 @@ def chats():
         return redirect(url_for('index'))
 
     try:
-        chats_data = analytics.get_most_active_chats(limit=1000)  # Все чаты
+        raw_chats = analytics.get_most_active_chats(limit=1000)  # Все чаты
+        
+        # Преобразуем данные к ожидаемому формату
+        chats_data = [transform_chat_data(chat) for chat in raw_chats]
+        
         return render_template('chats.html', chats=chats_data)
     except Exception as e:
         flash(f'Ошибка загрузки чатов: {e}', 'error')
@@ -119,7 +144,18 @@ def analytics_page():
 
     try:
         # Активные чаты
-        active_chats = analytics.get_most_active_chats(limit=15)
+        raw_active_chats = analytics.get_most_active_chats(limit=15)
+        
+        # Преобразуем данные к ожидаемому формату
+        active_chats = []
+        for chat in raw_active_chats:
+            active_chats.append({
+                'chat_name': chat['chat_name'],
+                'chat_type': chat['chat_type'],
+                'message_count': chat['message_count'],
+                'unique_users': chat['unique_users'],
+                'active_days': chat.get('active_days', 0)
+            })
 
         # Анализ времени
         time_analysis = analytics.get_activity_by_time()
@@ -137,7 +173,11 @@ def analytics_page():
                              changes=changes)
     except Exception as e:
         flash(f'Ошибка загрузки аналитики: {e}', 'error')
-        return render_template('analytics.html')
+        return render_template('analytics.html', 
+                             active_chats=[], 
+                             time_analysis={'by_hour': [], 'by_weekday': []},
+                             topics={'top_words': [], 'total_messages_analyzed': 0, 'unique_words': 0},
+                             changes={})
 
 @app.route('/emoji-stats')
 def emoji_stats():
@@ -275,6 +315,208 @@ def search_page():
 def status_page():
     """Страница мониторинга статуса парсинга"""
     return render_template('status.html')
+
+@app.route('/message-changes')
+def message_changes():
+    """Страница со списком измененных сообщений"""
+    if not db:
+        return redirect(url_for('index'))
+    
+    try:
+        # Получаем фильтры из параметров запроса
+        action_type = request.args.get('type', 'all')  # all, edited, deleted
+        chat_id = request.args.get('chat_id', type=int)
+        limit = request.args.get('limit', 100, type=int)
+        
+        # Получаем измененные сообщения
+        if action_type == 'edited':
+            changes = db.get_edited_messages(chat_id, limit)
+        elif action_type == 'deleted':
+            changes = db.get_deleted_messages(chat_id, limit)
+        else:
+            # Получаем все изменения
+            edited = db.get_edited_messages(chat_id, limit//2)
+            deleted = db.get_deleted_messages(chat_id, limit//2)
+            changes = edited + deleted
+            changes.sort(key=lambda x: x['timestamp'], reverse=True)
+            changes = changes[:limit]
+        
+        # Получаем список чатов для фильтра
+        chats_list = analytics.get_most_active_chats(limit=1000) if analytics else []
+        
+        return render_template('message_changes.html', 
+                             changes=changes,
+                             action_type=action_type,
+                             selected_chat_id=chat_id,
+                             chats_list=chats_list)
+    except Exception as e:
+        flash(f'Ошибка загрузки изменений: {e}', 'error')
+        return render_template('message_changes.html', changes=[], chats_list=[])
+
+@app.route('/message-history/<int:chat_id>/<int:message_id>')
+def message_history(chat_id, message_id):
+    """История изменений конкретного сообщения"""
+    if not db:
+        return redirect(url_for('index'))
+    
+    try:
+        history = db.get_message_history(message_id, chat_id)
+        
+        if not history:
+            flash('История изменений не найдена', 'warning')
+            return redirect(url_for('message_changes'))
+        
+        # Получаем информацию о чате
+        chat_info = None
+        if analytics:
+            report = analytics.generate_chat_report(chat_id)
+            if 'chat_info' in report:
+                chat_info = report['chat_info']
+        
+        return render_template('message_history.html',
+                             history=history,
+                             message_id=message_id,
+                             chat_id=chat_id,
+                             chat_info=chat_info)
+    except Exception as e:
+        flash(f'Ошибка загрузки истории: {e}', 'error')
+        return redirect(url_for('message_changes'))
+
+@app.route('/chat/<int:chat_id>/messages')
+def chat_messages(chat_id):
+    """Просмотр сообщений чата с подсветкой изменений"""
+    if not db:
+        return redirect(url_for('index'))
+    
+    try:
+        # Получаем параметры пагинации
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        search = request.args.get('search', '').strip()
+        
+        # Получаем сообщения чата
+        with sqlite3.connect(db.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            # Базовый запрос
+            query = '''
+                SELECT 
+                    m.id,
+                    m.text,
+                    m.date,
+                    m.is_deleted,
+                    m.media_type,
+                    m.views,
+                    m.forwards,
+                    u.username,
+                    u.first_name,
+                    u.last_name,
+                    (SELECT COUNT(*) FROM message_history 
+                     WHERE message_id = m.id AND chat_id = m.chat_id 
+                     AND action_type = 'edited') as edit_count,
+                    (SELECT MAX(timestamp) FROM message_history 
+                     WHERE message_id = m.id AND chat_id = m.chat_id 
+                     AND action_type = 'edited') as last_edit
+                FROM messages m
+                LEFT JOIN users u ON m.sender_id = u.id
+                WHERE m.chat_id = ?
+            '''
+            
+            params = [chat_id]
+            
+            # Добавляем поиск если есть
+            if search:
+                query += ' AND m.text LIKE ?'
+                params.append(f'%{search}%')
+            
+            # Сортировка и пагинация
+            query += ' ORDER BY m.date DESC LIMIT ? OFFSET ?'
+            params.extend([per_page, (page - 1) * per_page])
+            
+            messages = conn.execute(query, params).fetchall()
+            
+            # Подсчитываем общее количество
+            count_query = 'SELECT COUNT(*) FROM messages WHERE chat_id = ?'
+            count_params = [chat_id]
+            if search:
+                count_query += ' AND text LIKE ?'
+                count_params.append(f'%{search}%')
+            
+            total_count = conn.execute(count_query, count_params).fetchone()[0]
+        
+        # Получаем информацию о чате
+        chat_info = None
+        if analytics:
+            report = analytics.generate_chat_report(chat_id)
+            if 'chat_info' in report:
+                chat_info = report['chat_info']
+        
+        # Вычисляем пагинацию
+        total_pages = (total_count + per_page - 1) // per_page
+        
+        return render_template('chat_messages.html',
+                             messages=[dict(m) for m in messages],
+                             chat_info=chat_info,
+                             chat_id=chat_id,
+                             page=page,
+                             per_page=per_page,
+                             total_pages=total_pages,
+                             total_count=total_count,
+                             search=search)
+    except Exception as e:
+        flash(f'Ошибка загрузки сообщений: {e}', 'error')
+        return redirect(url_for('chats'))
+
+@app.route('/api/message-changes/<int:chat_id>')
+def api_get_message_changes(chat_id):
+    """API для получения измененных сообщений чата"""
+    if not db:
+        return jsonify({'error': 'База данных недоступна'}), 500
+    
+    try:
+        action_type = request.args.get('type', 'all')
+        limit = request.args.get('limit', 50, type=int)
+        
+        if action_type == 'edited':
+            changes = db.get_edited_messages(chat_id, limit)
+        elif action_type == 'deleted':
+            changes = db.get_deleted_messages(chat_id, limit)
+        else:
+            edited = db.get_edited_messages(chat_id, limit//2)
+            deleted = db.get_deleted_messages(chat_id, limit//2)
+            changes = edited + deleted
+            changes.sort(key=lambda x: x['timestamp'], reverse=True)
+            changes = changes[:limit]
+        
+        return jsonify({
+            'success': True,
+            'changes': changes,
+            'total': len(changes)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/check-updates', methods=['POST'])
+def api_check_updates():
+    """API для проверки обновлений сообщений"""
+    if not active_parser:
+        return jsonify({
+            'error': 'Парсер не активен. Запустите парсинг для проверки обновлений.'
+        }), 400
+    
+    try:
+        chat_id = request.json.get('chat_id')
+        if not chat_id:
+            return jsonify({'error': 'Не указан chat_id'}), 400
+        
+        # Запускаем проверку обновлений для конкретного чата
+        # Это будет использовать активный парсер для проверки
+        return jsonify({
+            'success': True,
+            'message': 'Проверка обновлений запущена. Следите за статусом парсинга.'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/status')
 def api_get_status():

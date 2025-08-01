@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Измененные сообщения - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="bi bi-pencil-square"></i> Измененные сообщения
+        </h2>
+
+        <!-- Фильтры -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" action="{{ url_for('message_changes') }}" class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Тип изменения</label>
+                        <select name="type" class="form-select" onchange="this.form.submit()">
+                            <option value="all" {% if action_type == 'all' %}selected{% endif %}>Все изменения</option>
+                            <option value="edited" {% if action_type == 'edited' %}selected{% endif %}>Отредактированные</option>
+                            <option value="deleted" {% if action_type == 'deleted' %}selected{% endif %}>Удаленные</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Чат</label>
+                        <select name="chat_id" class="form-select" onchange="this.form.submit()">
+                            <option value="">Все чаты</option>
+                            {% for chat in chats_list %}
+                                <option value="{{ chat.chat_id }}" {% if selected_chat_id == chat.chat_id %}selected{% endif %}>
+                                    {{ chat.chat_name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Количество</label>
+                        <select name="limit" class="form-select" onchange="this.form.submit()">
+                            <option value="50">50</option>
+                            <option value="100" selected>100</option>
+                            <option value="200">200</option>
+                            <option value="500">500</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Список изменений -->
+        {% if changes %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Дата изменения</th>
+                            <th>Тип</th>
+                            <th>Чат</th>
+                            <th>Автор</th>
+                            <th>Изменение</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for change in changes %}
+                            <tr>
+                                <td>
+                                    <small>{{ change.timestamp }}</small>
+                                </td>
+                                <td>
+                                    {% if change.action_type == 'edited' %}
+                                        <span class="badge bg-warning">
+                                            <i class="bi bi-pencil"></i> Изменено
+                                        </span>
+                                    {% elif change.action_type == 'deleted' %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-trash"></i> Удалено
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ change.action_type }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('chat_messages', chat_id=change.chat_id) }}">
+                                        {{ change.chat_name[:20] }}{% if change.chat_name|length > 20 %}...{% endif %}
+                                    </a>
+                                </td>
+                                <td>
+                                    <small>
+                                        {% if change.first_name %}
+                                            {{ change.first_name }}
+                                        {% elif change.username %}
+                                            @{{ change.username }}
+                                        {% else %}
+                                            User {{ change.sender_id }}
+                                        {% endif %}
+                                    </small>
+                                </td>
+                                <td>
+                                    {% if change.action_type == 'edited' %}
+                                        <div class="text-truncate" style="max-width: 400px;">
+                                            <del class="text-muted">{{ change.old_text[:100] }}{% if change.old_text|length > 100 %}...{% endif %}</del>
+                                            <br>
+                                            <span class="text-success">{{ change.new_text[:100] }}{% if change.new_text|length > 100 %}...{% endif %}</span>
+                                        </div>
+                                    {% elif change.action_type == 'deleted' %}
+                                        <div class="text-truncate text-muted" style="max-width: 400px;">
+                                            {{ change.text[:100] }}{% if change.text|length > 100 %}...{% endif %}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('message_history', chat_id=change.chat_id, message_id=change.message_id) }}" 
+                                       class="btn btn-sm btn-outline-primary" 
+                                       title="История изменений">
+                                        <i class="bi bi-clock-history"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> Нет измененных сообщений для отображения
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Скрипт для динамической загрузки изменений -->
+<script>
+function checkForUpdates(chatId) {
+    fetch('/api/check-updates', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({chat_id: chatId})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+        } else {
+            alert('Ошибка: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Ошибка при запросе обновлений');
+    });
+}
+</script>
+{% endblock %}

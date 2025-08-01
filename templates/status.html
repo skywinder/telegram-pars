@@ -277,19 +277,58 @@
             }
 
             let progressHtml = '';
-            if (statusData.progress && statusData.progress.total_chats > 0) {
+            if (statusData.progress) {
                 const progress = statusData.progress;
-                const percentage = (progress.processed_chats / progress.total_chats * 100).toFixed(1);
+                
+                // Прогресс по чатам
+                let chatProgressHtml = '';
+                if (progress.total_chats > 0) {
+                    const percentage = (progress.processed_chats / progress.total_chats * 100).toFixed(1);
+                    chatProgressHtml = `
+                        <p><strong>📁 Чаты:</strong> ${progress.processed_chats}/${progress.total_chats} (${percentage}%)</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${percentage}%"></div>
+                        </div>
+                    `;
+                }
+                
+                // Прогресс по сообщениям
+                let messageProgressHtml = '';
+                if (progress.current_chat_messages_processed !== undefined) {
+                    const msgTotal = progress.current_chat_messages;
+                    const msgProcessed = progress.current_chat_messages_processed;
+                    
+                    if (msgTotal && msgTotal !== 'all') {
+                        const msgPercentage = (msgProcessed / msgTotal * 100).toFixed(1);
+                        messageProgressHtml = `
+                            <p><strong>💬 Сообщения в текущем чате:</strong> ${msgProcessed}/${msgTotal} (${msgPercentage}%)</p>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${msgPercentage}%"></div>
+                            </div>
+                        `;
+                    } else {
+                        messageProgressHtml = `<p><strong>💬 Обработано сообщений:</strong> ${msgProcessed}</p>`;
+                    }
+                    
+                    if (progress.new_messages_found > 0) {
+                        messageProgressHtml += `<p><strong>✨ Найдено новых:</strong> ${progress.new_messages_found}</p>`;
+                    }
+                }
+                
+                // Фаза парсинга
+                let phaseHtml = '';
+                if (progress.parsing_phase) {
+                    phaseHtml = `<p><strong>📋 Фаза:</strong> ${progress.parsing_phase}</p>`;
+                }
 
                 progressHtml = `
                     <div class="current-chat">
                         <h3>📊 Прогресс Операции</h3>
-                        <p><strong>Чаты:</strong> ${progress.processed_chats}/${progress.total_chats} (${percentage}%)</p>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${percentage}%"></div>
-                        </div>
+                        ${phaseHtml}
+                        ${chatProgressHtml}
+                        ${messageProgressHtml}
                         ${progress.estimated_time_remaining ?
-                            `<p><strong>⏰ Осталось:</strong> ${formatTime(progress.estimated_time_remaining)}</p>` :
+                            `<p><strong>⏰ Осталось:</strong> ${progress.estimated_time_remaining}</p>` :
                             ''
                         }
                     </div>
@@ -312,11 +351,21 @@
             let statsHtml = '';
             if (statusData.session_statistics) {
                 const stats = statusData.session_statistics;
+                
+                // Вычисляем дополнительную статистику
+                const duration = stats.duration_seconds || 0;
+                const messagesPerMinute = stats.messages_saved && duration > 0 ? 
+                    (stats.messages_saved / duration * 60).toFixed(0) : 0;
+                
                 statsHtml = `
                     <div class="stats-grid">
                         <div class="stat-item">
                             <div class="stat-number">${stats.total_requests || 0}</div>
                             <div class="stat-label">Всего Запросов</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">${stats.messages_saved || 0}</div>
+                            <div class="stat-label">Сохранено Сообщений</div>
                         </div>
                         <div class="stat-item">
                             <div class="stat-number">${stats.flood_waits || 0}</div>
@@ -327,16 +376,12 @@
                             <div class="stat-label">Других Ошибок</div>
                         </div>
                         <div class="stat-item">
-                            <div class="stat-number">${formatTime(stats.duration_seconds || 0)}</div>
+                            <div class="stat-number">${formatTime(duration)}</div>
                             <div class="stat-label">Длительность</div>
                         </div>
                         <div class="stat-item">
-                            <div class="stat-number">${(stats.requests_per_minute || 0).toFixed(1)}</div>
-                            <div class="stat-label">Запросов/Мин</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number">${(stats.flood_wait_rate || 0).toFixed(1)}%</div>
-                            <div class="stat-label">% FloodWait</div>
+                            <div class="stat-number">${messagesPerMinute}</div>
+                            <div class="stat-label">Сообщений/Мин</div>
                         </div>
                     </div>
                 `;

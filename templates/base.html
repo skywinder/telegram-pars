@@ -60,6 +60,9 @@
                                 <i class="bi bi-chat-left-text"></i> Инициаторы диалогов
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('message_changes') }}">
+                                <i class="bi bi-pencil-square"></i> Измененные сообщения
+                            </a></li>
                             <li><a class="dropdown-item" href="{{ url_for('search_page') }}">
                                 <i class="bi bi-search"></i> Поиск
                             </a></li>
@@ -95,6 +98,15 @@
 
     <!-- Main Content -->
     <main class="container mt-4">
+        <!-- Back Button (visible on all pages except home) -->
+        {% if request.endpoint != 'index' %}
+        <div class="mb-3">
+            <button onclick="history.back()" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Назад
+            </button>
+        </div>
+        {% endif %}
+        
         {% block content %}{% endblock %}
     </main>
 

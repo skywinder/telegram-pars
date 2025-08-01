@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block title %}Сообщения чата {{ chat_info.name if chat_info else '' }} - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="bi bi-chat-dots"></i> 
+            Сообщения чата
+            {% if chat_info %}
+                "{{ chat_info.name }}"
+            {% endif %}
+        </h2>
+
+        <!-- Информация о чате -->
+        {% if chat_info %}
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Тип:</strong> {{ chat_info.type }}</p>
+                        <p class="mb-1"><strong>ID:</strong> {{ chat_id }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Всего сообщений:</strong> {{ total_count }}</p>
+                        <p class="mb-1">
+                            <strong>Измененных:</strong> 
+                            <a href="{{ url_for('message_changes', chat_id=chat_id, type='edited') }}">
+                                Посмотреть измененные
+                            </a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Поиск и фильтры -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" action="{{ url_for('chat_messages', chat_id=chat_id) }}" class="row g-3">
+                    <div class="col-md-8">
+                        <input type="text" 
+                               name="search" 
+                               class="form-control" 
+                               placeholder="Поиск по тексту сообщения..." 
+                               value="{{ search }}">
+                    </div>
+                    <div class="col-md-2">
+                        <select name="per_page" class="form-select">
+                            <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+                            <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                            <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-search"></i> Поиск
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Список сообщений -->
+        {% if messages %}
+            <div class="messages-container">
+                {% for message in messages %}
+                    <div class="card mb-3 {% if message.is_deleted %}border-danger opacity-75{% elif message.edit_count > 0 %}border-warning{% endif %}">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>
+                                        {% if message.first_name %}
+                                            {{ message.first_name }} {{ message.last_name or '' }}
+                                        {% elif message.username %}
+                                            @{{ message.username }}
+                                        {% else %}
+                                            User
+                                        {% endif %}
+                                    </strong>
+                                    <span class="text-muted ms-2">
+                                        #{{ message.id }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <small class="text-muted">
+                                        {{ message.date }}
+                                    </small>
+                                    {% if message.edit_count > 0 %}
+                                        <span class="badge bg-warning ms-2" title="Изменено {{ message.edit_count }} раз">
+                                            <i class="bi bi-pencil"></i> {{ message.edit_count }}
+                                        </span>
+                                    {% endif %}
+                                    {% if message.is_deleted %}
+                                        <span class="badge bg-danger ms-2">
+                                            <i class="bi bi-trash"></i> Удалено
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            {% if message.text %}
+                                <p class="mb-2 {% if message.is_deleted %}text-decoration-line-through{% endif %}">
+                                    {{ message.text }}
+                                </p>
+                            {% endif %}
+                            
+                            {% if message.media_type %}
+                                <p class="text-muted mb-2">
+                                    <i class="bi bi-paperclip"></i> {{ message.media_type }}
+                                </p>
+                            {% endif %}
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    {% if message.views %}
+                                        <span class="text-muted me-3">
+                                            <i class="bi bi-eye"></i> {{ message.views }}
+                                        </span>
+                                    {% endif %}
+                                    {% if message.forwards %}
+                                        <span class="text-muted">
+                                            <i class="bi bi-share"></i> {{ message.forwards }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    {% if message.edit_count > 0 or message.is_deleted %}
+                                        <a href="{{ url_for('message_history', chat_id=chat_id, message_id=message.id) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-clock-history"></i> История
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Пагинация -->
+            {% if total_pages > 1 %}
+                <nav aria-label="Навигация по страницам">
+                    <ul class="pagination justify-content-center">
+                        <!-- Предыдущая страница -->
+                        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                            <a class="page-link" 
+                               href="{{ url_for('chat_messages', chat_id=chat_id, page=page-1, per_page=per_page, search=search) }}">
+                                Предыдущая
+                            </a>
+                        </li>
+
+                        <!-- Номера страниц -->
+                        {% set start_page = max(1, page - 2) %}
+                        {% set end_page = min(total_pages, page + 2) %}
+                        
+                        {% if start_page > 1 %}
+                            <li class="page-item">
+                                <a class="page-link" 
+                                   href="{{ url_for('chat_messages', chat_id=chat_id, page=1, per_page=per_page, search=search) }}">
+                                    1
+                                </a>
+                            </li>
+                            {% if start_page > 2 %}
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                            {% endif %}
+                        {% endif %}
+
+                        {% for p in range(start_page, end_page + 1) %}
+                            <li class="page-item {% if p == page %}active{% endif %}">
+                                <a class="page-link" 
+                                   href="{{ url_for('chat_messages', chat_id=chat_id, page=p, per_page=per_page, search=search) }}">
+                                    {{ p }}
+                                </a>
+                            </li>
+                        {% endfor %}
+
+                        {% if end_page < total_pages %}
+                            {% if end_page < total_pages - 1 %}
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                            {% endif %}
+                            <li class="page-item">
+                                <a class="page-link" 
+                                   href="{{ url_for('chat_messages', chat_id=chat_id, page=total_pages, per_page=per_page, search=search) }}">
+                                    {{ total_pages }}
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        <!-- Следующая страница -->
+                        <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+                            <a class="page-link" 
+                               href="{{ url_for('chat_messages', chat_id=chat_id, page=page+1, per_page=per_page, search=search) }}">
+                                Следующая
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            {% endif %}
+        {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> 
+                {% if search %}
+                    Сообщения не найдены по запросу "{{ search }}"
+                {% else %}
+                    В этом чате пока нет сообщений
+                {% endif %}
+            </div>
+        {% endif %}
+
+        <!-- Кнопки действий -->
+        <div class="mt-4">
+            <button class="btn btn-success" onclick="checkForUpdates({{ chat_id }})">
+                <i class="bi bi-arrow-clockwise"></i> Проверить обновления
+            </button>
+            <a href="{{ url_for('chat_detail', chat_id=chat_id) }}" class="btn btn-primary">
+                <i class="bi bi-info-circle"></i> Подробнее о чате
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function checkForUpdates(chatId) {
+    if (confirm('Запустить проверку обновлений для этого чата? Это может занять некоторое время.')) {
+        fetch('/api/check-updates', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({chat_id: chatId})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                // Перенаправляем на страницу статуса
+                window.location.href = '/status';
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Ошибка при запросе обновлений');
+        });
+    }
+}
+
+// Подсветка найденного текста
+{% if search %}
+document.addEventListener('DOMContentLoaded', function() {
+    const searchText = "{{ search }}";
+    const messages = document.querySelectorAll('.card-body p');
+    
+    messages.forEach(function(p) {
+        const text = p.textContent;
+        const regex = new RegExp('(' + searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+        if (regex.test(text)) {
+            p.innerHTML = text.replace(regex, '<mark>$1</mark>');
+        }
+    });
+});
+{% endif %}
+</script>
+{% endblock %}

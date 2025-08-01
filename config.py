@@ -37,6 +37,9 @@ EXPORT_FORMATS = {
     'ai_ready': True  # Создавать файлы для AI анализа
 }
 
+# Настройки автоматизации
+AUTO_CREATE_AI_ANALYSIS = True  # Автоматически создавать AI анализ после парсинга
+
 # Настройки аналитики
 ANALYTICS_SETTINGS = {
     'min_word_length': 4,  # Минимальная длина слова для анализа тем

@@ -100,19 +100,26 @@ class StatusMonitor:
 
         # Информация о текущем чате
         current_chat = data.get('current_chat')
-        if current_chat:
+        if current_chat and isinstance(current_chat, dict):
             print(f"💬 Текущий чат: {current_chat.get('name', 'Unknown')}")
             print(f"🏷️  Тип чата: {current_chat.get('type', 'Unknown')}")
+            print(f"🆔 ID чата: {current_chat.get('id', 'Unknown')}")
 
         # Прогресс
         progress = data.get('progress', {})
+        
+        # Фаза парсинга
+        if progress.get('parsing_phase'):
+            print(f"\n📋 Фаза: {progress['parsing_phase']}")
+        
+        # Прогресс по чатам
         if progress.get('total_chats', 0) > 0:
             processed = progress.get('processed_chats', 0)
             total = progress.get('total_chats', 0)
             percentage = (processed / total) * 100 if total > 0 else 0
 
-            print(f"\n📊 ПРОГРЕСС:")
-            print(f"├─ Чаты: {processed}/{total} ({percentage:.1f}%)")
+            print(f"\n📊 ПРОГРЕСС ПО ЧАТАМ:")
+            print(f"├─ Обработано: {processed}/{total} ({percentage:.1f}%)")
 
             # Progress bar
             bar_length = 40
@@ -123,19 +130,49 @@ class StatusMonitor:
             # Estimated time remaining
             eta = progress.get('estimated_time_remaining')
             if eta and eta > 0:
-                print(f"├─ Осталось: ~{self.format_time(eta)}")
+                print(f"└─ Осталось: ~{self.format_time(eta)}")
+        
+        # Прогресс по сообщениям
+        if 'current_chat_messages_processed' in progress:
+            msg_processed = progress['current_chat_messages_processed']
+            msg_total = progress.get('current_chat_messages', 0)
+            
+            print(f"\n💬 СООБЩЕНИЯ В ТЕКУЩЕМ ЧАТЕ:")
+            if isinstance(msg_total, int) and msg_total > 0:
+                msg_percentage = (msg_processed / msg_total) * 100
+                print(f"├─ Обработано: {msg_processed}/{msg_total} ({msg_percentage:.1f}%)")
+                
+                # Progress bar for messages
+                bar_length = 40
+                filled_length = int(bar_length * msg_processed // msg_total)
+                bar = '█' * filled_length + '░' * (bar_length - filled_length)
+                print(f"├─ [{bar}]")
+            else:
+                print(f"├─ Обработано: {msg_processed}")
+            
+            # Новые сообщения
+            new_found = progress.get('new_messages_found', 0)
+            if new_found > 0:
+                print(f"└─ ✨ Найдено новых: {new_found}")
 
         # Статистика сессии
         session_stats = data.get('session_statistics', {})
         if session_stats:
             print(f"\n📈 СТАТИСТИКА СЕССИИ:")
             print(f"├─ Всего запросов: {session_stats.get('total_requests', 0)}")
+            print(f"├─ Сохранено сообщений: {session_stats.get('messages_saved', 0)}")
             print(f"├─ FloodWait ошибок: {session_stats.get('flood_waits', 0)}")
             print(f"├─ Других ошибок: {session_stats.get('errors', 0)}")
 
             duration = session_stats.get('duration_seconds', 0)
             if duration > 0:
                 print(f"├─ Длительность: {self.format_time(duration)}")
+                
+                # Скорость обработки
+                msg_saved = session_stats.get('messages_saved', 0)
+                if msg_saved > 0:
+                    msg_per_min = (msg_saved / duration) * 60
+                    print(f"├─ Сообщений/мин: {msg_per_min:.0f}")
 
             rpm = session_stats.get('requests_per_minute', 0)
             if rpm > 0:
@@ -144,6 +181,8 @@ class StatusMonitor:
             flood_rate = session_stats.get('flood_wait_rate', 0)
             if flood_rate > 0:
                 print(f"└─ Процент FloodWait: {flood_rate:.1f}%")
+            else:
+                print(f"└─ API работает стабильно")
 
         print(f"\n🔄 Последнее обновление: {data.get('last_update', 'Не указано')}")
         print("\n💡 Нажмите Ctrl+C для изящного прерывания операции")

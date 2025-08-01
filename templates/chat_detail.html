@@ -25,7 +25,13 @@
                 <a href="{{ url_for('chats') }}" class="btn btn-outline-secondary me-2">
                     <i class="bi bi-arrow-left"></i> Назад к чатам
                 </a>
-                <button class="btn btn-primary" data-export-type="chat" data-chat-id="{{ chat_id }}">
+                <a href="{{ url_for('chat_messages', chat_id=chat_id) }}" class="btn btn-primary me-2">
+                    <i class="bi bi-chat-text"></i> Сообщения
+                </a>
+                <a href="{{ url_for('message_changes', chat_id=chat_id) }}" class="btn btn-warning me-2">
+                    <i class="bi bi-pencil-square"></i> Изменения
+                </a>
+                <button class="btn btn-success" data-export-type="chat" data-chat-id="{{ chat_id }}">
                     <i class="bi bi-download"></i> Экспорт
                 </button>
             </div>

@@ -415,3 +415,204 @@ class TelegramDatabase:
                 'recent_sessions': [dict(row) for row in recent_sessions],
                 'recent_changes': [dict(row) for row in recent_changes]
             }
+
+    def get_message_history(self, message_id: int, chat_id: int) -> List[Dict]:
+        """Получает полную историю изменений конкретного сообщения"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            history = conn.execute('''
+                SELECT 
+                    mh.id,
+                    mh.action_type,
+                    mh.old_text,
+                    mh.new_text,
+                    mh.timestamp,
+                    mh.scan_session,
+                    m.sender_id,
+                    u.username,
+                    u.first_name,
+                    u.last_name
+                FROM message_history mh
+                JOIN messages m ON mh.message_id = m.id AND mh.chat_id = m.chat_id
+                LEFT JOIN users u ON m.sender_id = u.id
+                WHERE mh.message_id = ? AND mh.chat_id = ?
+                ORDER BY mh.timestamp ASC
+            ''', (message_id, chat_id)).fetchall()
+            
+            return [dict(row) for row in history]
+
+    def get_edited_messages(self, chat_id: int = None, limit: int = 100) -> List[Dict]:
+        """Получает список всех отредактированных сообщений"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            query = '''
+                SELECT DISTINCT
+                    m.id as message_id,
+                    m.chat_id,
+                    c.name as chat_name,
+                    m.sender_id,
+                    u.username,
+                    u.first_name,
+                    u.last_name,
+                    m.date as message_date,
+                    m.text as current_text,
+                    COUNT(mh.id) as edit_count,
+                    MAX(mh.timestamp) as last_edit_time
+                FROM messages m
+                JOIN message_history mh ON m.id = mh.message_id AND m.chat_id = mh.chat_id
+                JOIN chats c ON m.chat_id = c.id
+                LEFT JOIN users u ON m.sender_id = u.id
+                WHERE mh.action_type = 'edited'
+            '''
+            
+            params = []
+            if chat_id:
+                query += ' AND m.chat_id = ?'
+                params.append(chat_id)
+                
+            query += '''
+                GROUP BY m.id, m.chat_id
+                ORDER BY last_edit_time DESC
+                LIMIT ?
+            '''
+            params.append(limit)
+            
+            messages = conn.execute(query, params).fetchall()
+            return [dict(row) for row in messages]
+
+    def get_deleted_messages(self, chat_id: int = None, limit: int = 100) -> List[Dict]:
+        """Получает список всех удаленных сообщений"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            query = '''
+                SELECT 
+                    m.id as message_id,
+                    m.chat_id,
+                    c.name as chat_name,
+                    m.sender_id,
+                    u.username,
+                    u.first_name,
+                    u.last_name,
+                    m.date as message_date,
+                    mh.old_text as deleted_text,
+                    mh.timestamp as deletion_time,
+                    mh.scan_session
+                FROM messages m
+                JOIN message_history mh ON m.id = mh.message_id AND m.chat_id = mh.chat_id
+                JOIN chats c ON m.chat_id = c.id
+                LEFT JOIN users u ON m.sender_id = u.id
+                WHERE m.is_deleted = TRUE AND mh.action_type = 'deleted'
+            '''
+            
+            params = []
+            if chat_id:
+                query += ' AND m.chat_id = ?'
+                params.append(chat_id)
+                
+            query += '''
+                ORDER BY mh.timestamp DESC
+                LIMIT ?
+            '''
+            params.append(limit)
+            
+            messages = conn.execute(query, params).fetchall()
+            return [dict(row) for row in messages]
+
+    def get_message_changes_by_date(self, start_date: str = None, end_date: str = None, 
+                                    action_type: str = None) -> List[Dict]:
+        """Получает изменения сообщений за определенный период"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            query = '''
+                SELECT 
+                    mh.id,
+                    mh.message_id,
+                    mh.chat_id,
+                    c.name as chat_name,
+                    mh.action_type,
+                    mh.old_text,
+                    mh.new_text,
+                    mh.timestamp,
+                    m.sender_id,
+                    u.username,
+                    u.first_name,
+                    u.last_name
+                FROM message_history mh
+                JOIN messages m ON mh.message_id = m.id AND mh.chat_id = m.chat_id
+                JOIN chats c ON mh.chat_id = c.id
+                LEFT JOIN users u ON m.sender_id = u.id
+                WHERE 1=1
+            '''
+            
+            params = []
+            
+            if start_date:
+                query += ' AND mh.timestamp >= ?'
+                params.append(start_date)
+                
+            if end_date:
+                query += ' AND mh.timestamp <= ?'
+                params.append(end_date)
+                
+            if action_type:
+                query += ' AND mh.action_type = ?'
+                params.append(action_type)
+                
+            query += ' ORDER BY mh.timestamp DESC'
+            
+            changes = conn.execute(query, params).fetchall()
+            return [dict(row) for row in changes]
+
+    def get_chat_change_statistics(self, chat_id: int) -> Dict:
+        """Получает статистику изменений для конкретного чата"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            # Статистика по типам изменений
+            change_stats = conn.execute('''
+                SELECT 
+                    action_type,
+                    COUNT(*) as count
+                FROM message_history
+                WHERE chat_id = ?
+                GROUP BY action_type
+            ''', (chat_id,)).fetchall()
+            
+            # Самые редактируемые сообщения
+            most_edited = conn.execute('''
+                SELECT 
+                    message_id,
+                    COUNT(*) as edit_count,
+                    m.text as current_text,
+                    m.sender_id,
+                    u.username
+                FROM message_history mh
+                JOIN messages m ON mh.message_id = m.id AND mh.chat_id = m.chat_id
+                LEFT JOIN users u ON m.sender_id = u.id
+                WHERE mh.chat_id = ? AND mh.action_type = 'edited'
+                GROUP BY message_id
+                ORDER BY edit_count DESC
+                LIMIT 10
+            ''', (chat_id,)).fetchall()
+            
+            # Активность по дням
+            daily_activity = conn.execute('''
+                SELECT 
+                    DATE(timestamp) as date,
+                    action_type,
+                    COUNT(*) as count
+                FROM message_history
+                WHERE chat_id = ? AND timestamp > datetime('now', '-30 days')
+                GROUP BY DATE(timestamp), action_type
+                ORDER BY date DESC
+            ''', (chat_id,)).fetchall()
+            
+            return {
+                'change_statistics': [dict(row) for row in change_stats],
+                'most_edited_messages': [dict(row) for row in most_edited],
+                'daily_activity': [dict(row) for row in daily_activity]
+            }
