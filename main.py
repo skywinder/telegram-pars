@@ -764,6 +764,7 @@ async def monitor_parsing_status(parser: TelegramParser):
     last_status = None
     last_chat_id = None
     start_time = datetime.now()
+    lines_printed = 0  # Счетчик напечатанных строк
 
     while True:
         try:
@@ -783,17 +784,12 @@ async def monitor_parsing_status(parser: TelegramParser):
                     else:
                         chat_name = str(chat_info) if chat_info else 'Неизвестный чат'
 
-                    # Очищаем экран для обновления
-                    print("\033[H\033[J", end='')  # Очищаем экран
+                    # Перемещаемся назад и очищаем старый вывод
+                    if lines_printed > 0:
+                        print(f"\033[{lines_printed}A\033[J", end='')  # Перемещаемся вверх и очищаем
                     
-                    # Заголовок
-                    print("=" * 60)
-                    print(f"📊 МОНИТОРИНГ ПАРСИНГА TELEGRAM")
-                    print("=" * 60)
-                    
-                    # Основная информация
-                    print(f"\n🔄 Операция: {operation}")
-                    print(f"💬 Текущий чат: {chat_name}")
+                    # Компактный вывод статуса
+                    print(f"📊 {operation}: {chat_name[:50]}...")
                     
                     # Фаза парсинга
                     parsing_phase = status['progress'].get('parsing_phase', '')
@@ -821,9 +817,12 @@ async def monitor_parsing_status(parser: TelegramParser):
                         msg_total = status['progress'].get('current_chat_messages', 0)
                         
                         print(f"\n💬 Текущий чат:")
+                        # Проверяем что msg_total это число, а не строка 'all'
                         if isinstance(msg_total, int) and msg_total > 0:
                             msg_progress = (msg_processed / msg_total) * 100
                             print(f"   Сообщений: {msg_processed}/{msg_total} ({msg_progress:.1f}%)")
+                        elif msg_total == 'all':
+                            print(f"   Обработано сообщений: {msg_processed} (все доступные)")
                         else:
                             print(f"   Обработано сообщений: {msg_processed}")
                         
@@ -832,36 +831,32 @@ async def monitor_parsing_status(parser: TelegramParser):
                         if new_found > 0:
                             print(f"   ✨ Найдено новых: {new_found}")
 
-                    # Время и скорость
+                    # Время и статистика
                     elapsed_time = datetime.now() - start_time
-                    print(f"\n⏱️ Время работы: {str(elapsed_time).split('.')[0]}")
-                    
-                    if status['progress'].get('estimated_time_remaining'):
-                        print(f"⏳ Осталось примерно: {status['progress']['estimated_time_remaining']}")
-
-                    # Статистика API
                     api_stats = parser.get_session_statistics()
+                    
+                    # Компактный вывод статистики в одну строку
+                    print(f"   ⏱️ Прошло времени: {str(elapsed_time).split('.')[0]}")
+                    
                     if api_stats:
-                        print(f"\n📡 Статистика API:")
-                        print(f"   Запросов: {api_stats['total_requests']}")
-                        
-                        if api_stats.get('messages_saved', 0) > 0:
-                            print(f"   Сохранено сообщений: {api_stats['messages_saved']}")
-                        
-                        if api_stats['flood_waits'] > 0:
-                            print(f"   ⚠️ FloodWait ошибок: {api_stats['flood_waits']}")
-                        if api_stats['errors'] > 0:
-                            print(f"   ❌ Других ошибок: {api_stats['errors']}")
-
-                        # Скорость обработки
+                        print(f"   📡 API: {api_stats['total_requests']} запросов", end='')
                         if api_stats['total_requests'] > 0 and elapsed_time.total_seconds() > 0:
                             speed = api_stats['total_requests'] / elapsed_time.total_seconds()
-                            msg_speed = api_stats.get('messages_saved', 0) / elapsed_time.total_seconds() * 60
-                            print(f"   ⚡ Скорость: {speed:.1f} запросов/сек")
-                            print(f"   📨 Сообщений в минуту: {msg_speed:.0f}")
+                            print(f" | ⚡ Скорость: {speed:.1f} запросов/сек")
+                        else:
+                            print()  # Новая строка
 
                     print(f"\n💡 Для остановки нажмите Ctrl+C")
-                    print("─" * 60)
+                    
+                    # Считаем количество напечатанных строк (более точный подсчет)
+                    lines_printed = 8  # Базовые строки
+                    if status['progress']['total_chats'] > 0:
+                        lines_printed += 2  # Прогресс по чатам
+                    if 'current_chat_messages_processed' in status['progress']:
+                        lines_printed += 2  # Прогресс по сообщениям
+                        if status['progress'].get('new_messages_found', 0) > 0:
+                            lines_printed += 1  # Новые сообщения
+                    lines_printed += 3  # Время и статистика
 
                 last_status = status
                 last_chat_id = current_chat_id
@@ -877,8 +872,10 @@ async def monitor_parsing_status(parser: TelegramParser):
         except asyncio.CancelledError:
             break
         except Exception as e:
-            print(f"⚠️ Ошибка мониторинга: {e}")
-            break
+            # Выводим ошибку на новой строке чтобы не испортить вывод
+            print(f"\n⚠️ Ошибка мониторинга: {e}")
+            lines_printed = 0  # Сбрасываем счетчик
+            await asyncio.sleep(1)
 
 async def show_database_stats(db: TelegramDatabase):
     """Показывает статистику базы данных"""
