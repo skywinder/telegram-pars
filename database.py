@@ -12,7 +12,7 @@ class TelegramDatabase:
     """
     Класс для работы с базой данных истории сообщений
     """
-    
+
     def __init__(self, db_path: str = None):
         """Инициализация базы данных"""
         if db_path is None:
@@ -20,14 +20,20 @@ class TelegramDatabase:
             if not os.path.exists(config.OUTPUT_DIR):
                 os.makedirs(config.OUTPUT_DIR)
             db_path = os.path.join(config.OUTPUT_DIR, 'telegram_history.db')
-        
+
         self.db_path = db_path
+
+        # Создаем директорию для любого пути к базе данных
+        db_dir = os.path.dirname(self.db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+
         self.init_database()
-    
+
     def init_database(self):
         """Создание таблиц в базе данных"""
         print(f"🗄️ Инициализация базы данных: {self.db_path}")
-        
+
         with sqlite3.connect(self.db_path) as conn:
             conn.executescript('''
                 -- Таблица чатов
@@ -39,7 +45,7 @@ class TelegramDatabase:
                     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     total_messages INTEGER DEFAULT 0
                 );
-                
+
                 -- Таблица пользователей
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY,
@@ -49,7 +55,7 @@ class TelegramDatabase:
                     phone TEXT,
                     first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-                
+
                 -- Основная таблица сообщений
                 CREATE TABLE IF NOT EXISTS messages (
                     id INTEGER,
@@ -67,7 +73,7 @@ class TelegramDatabase:
                     FOREIGN KEY (chat_id) REFERENCES chats (id),
                     FOREIGN KEY (sender_id) REFERENCES users (id)
                 );
-                
+
                 -- История изменений сообщений
                 CREATE TABLE IF NOT EXISTS message_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,7 +86,7 @@ class TelegramDatabase:
                     scan_session TEXT, -- ID сессии парсинга
                     FOREIGN KEY (message_id, chat_id) REFERENCES messages (id, chat_id)
                 );
-                
+
                 -- Реакции на сообщения
                 CREATE TABLE IF NOT EXISTS message_reactions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,7 +99,7 @@ class TelegramDatabase:
                     FOREIGN KEY (message_id, chat_id) REFERENCES messages (id, chat_id),
                     FOREIGN KEY (user_id) REFERENCES users (id)
                 );
-                
+
                 -- Сессии парсинга для отслеживания изменений
                 CREATE TABLE IF NOT EXISTS scan_sessions (
                     id TEXT PRIMARY KEY,
@@ -103,29 +109,29 @@ class TelegramDatabase:
                     total_messages INTEGER,
                     changes_detected INTEGER DEFAULT 0
                 );
-                
+
                 -- Индексы для быстрого поиска
                 CREATE INDEX IF NOT EXISTS idx_messages_chat_date ON messages(chat_id, date);
                 CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
                 CREATE INDEX IF NOT EXISTS idx_history_message ON message_history(message_id, chat_id);
                 CREATE INDEX IF NOT EXISTS idx_reactions_message ON message_reactions(message_id, chat_id);
             ''')
-        
+
         print("✅ База данных инициализирована")
-    
+
     def create_scan_session(self) -> str:
         """Создает новую сессию парсинга"""
         session_id = f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        
+
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('''
                 INSERT INTO scan_sessions (id, start_time)
                 VALUES (?, ?)
             ''', (session_id, datetime.now()))
-        
+
         print(f"🔄 Создана сессия парсинга: {session_id}")
         return session_id
-    
+
     def save_chat(self, chat_data: Dict) -> None:
         """Сохраняет информацию о чате"""
         with sqlite3.connect(self.db_path) as conn:
@@ -138,7 +144,7 @@ class TelegramDatabase:
                 chat_data['type'],
                 datetime.now()
             ))
-    
+
     def save_message_with_history(self, message_data: Dict, session_id: str) -> None:
         """
         Сохраняет сообщение и отслеживает изменения
@@ -146,17 +152,17 @@ class TelegramDatabase:
         message_id = message_data['id']
         chat_id = message_data['chat_id']
         current_text = message_data.get('text', '')
-        
+
         with sqlite3.connect(self.db_path) as conn:
             # Проверяем, есть ли уже это сообщение
             existing = conn.execute('''
-                SELECT text, is_deleted FROM messages 
+                SELECT text, is_deleted FROM messages
                 WHERE id = ? AND chat_id = ?
             ''', (message_id, chat_id)).fetchone()
-            
+
             if existing:
                 old_text, is_deleted = existing
-                
+
                 # Проверяем изменения
                 if old_text != current_text and not is_deleted:
                     # Сообщение было отредактировано
@@ -165,11 +171,11 @@ class TelegramDatabase:
                         old_text, current_text, session_id
                     )
                     print(f"📝 Обнаружено редактирование сообщения {message_id}")
-                
+
                 # Обновляем сообщение
                 conn.execute('''
-                    UPDATE messages SET 
-                        text = ?, date = ?, media_type = ?, 
+                    UPDATE messages SET
+                        text = ?, date = ?, media_type = ?,
                         reply_to_msg_id = ?, views = ?, forwards = ?
                     WHERE id = ? AND chat_id = ?
                 ''', (
@@ -185,8 +191,8 @@ class TelegramDatabase:
             else:
                 # Новое сообщение
                 conn.execute('''
-                    INSERT INTO messages 
-                    (id, chat_id, sender_id, date, text, media_type, 
+                    INSERT INTO messages
+                    (id, chat_id, sender_id, date, text, media_type,
                      reply_to_msg_id, views, forwards)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
@@ -200,13 +206,13 @@ class TelegramDatabase:
                     message_data.get('views', 0),
                     message_data.get('forwards', 0)
                 ))
-                
+
                 # Логируем создание
                 self._log_message_change(
                     conn, message_id, chat_id, 'created',
                     None, current_text, session_id
                 )
-    
+
     def mark_deleted_messages(self, chat_id: int, current_message_ids: List[int], session_id: str) -> int:
         """
         Помечает сообщения как удаленные, если их нет в текущем парсинге
@@ -216,51 +222,51 @@ class TelegramDatabase:
                 # Находим сообщения, которых нет в текущем списке
                 placeholders = ','.join(['?' for _ in current_message_ids])
                 deleted_messages = conn.execute(f'''
-                    SELECT id, text FROM messages 
-                    WHERE chat_id = ? AND is_deleted = FALSE 
+                    SELECT id, text FROM messages
+                    WHERE chat_id = ? AND is_deleted = FALSE
                     AND id NOT IN ({placeholders})
                 ''', [chat_id] + current_message_ids).fetchall()
             else:
                 # Если нет текущих сообщений, все помечаем как удаленные
                 deleted_messages = conn.execute('''
-                    SELECT id, text FROM messages 
+                    SELECT id, text FROM messages
                     WHERE chat_id = ? AND is_deleted = FALSE
                 ''', (chat_id,)).fetchall()
-            
+
             # Помечаем как удаленные и логируем
             deleted_count = 0
             for msg_id, old_text in deleted_messages:
                 conn.execute('''
-                    UPDATE messages SET is_deleted = TRUE 
+                    UPDATE messages SET is_deleted = TRUE
                     WHERE id = ? AND chat_id = ?
                 ''', (msg_id, chat_id))
-                
+
                 self._log_message_change(
                     conn, msg_id, chat_id, 'deleted',
                     old_text, None, session_id
                 )
                 deleted_count += 1
-            
+
             if deleted_count > 0:
                 print(f"🗑️ Помечено как удаленные: {deleted_count} сообщений")
-            
+
             return deleted_count
-    
-    def _log_message_change(self, conn, message_id: int, chat_id: int, 
+
+    def _log_message_change(self, conn, message_id: int, chat_id: int,
                            action: str, old_text: str, new_text: str, session_id: str):
         """Логирует изменение сообщения"""
         conn.execute('''
-            INSERT INTO message_history 
+            INSERT INTO message_history
             (message_id, chat_id, action_type, old_text, new_text, scan_session)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (message_id, chat_id, action, old_text, new_text, session_id))
-    
+
     def get_chat_statistics(self) -> List[Dict]:
         """Получает статистику по чатам"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             stats = conn.execute('''
-                SELECT 
+                SELECT
                     c.id, c.name, c.type,
                     COUNT(m.id) as total_messages,
                     COUNT(DISTINCT m.sender_id) as unique_senders,
@@ -274,28 +280,28 @@ class TelegramDatabase:
                 GROUP BY c.id, c.name, c.type
                 ORDER BY total_messages DESC
             ''').fetchall()
-            
+
             return [dict(row) for row in stats]
-    
+
     def get_changes_summary(self, days: int = 7) -> Dict:
         """Получает сводку изменений за последние дни"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            
+
             # Изменения за период
             changes = conn.execute('''
-                SELECT 
+                SELECT
                     action_type,
                     COUNT(*) as count,
                     COUNT(DISTINCT chat_id) as affected_chats
-                FROM message_history 
+                FROM message_history
                 WHERE timestamp > datetime('now', '-{} days')
                 GROUP BY action_type
             '''.format(days)).fetchall()
-            
+
             # Самые активные чаты по изменениям
             active_chats = conn.execute('''
-                SELECT 
+                SELECT
                     c.name,
                     COUNT(mh.id) as changes_count
                 FROM message_history mh
@@ -305,20 +311,20 @@ class TelegramDatabase:
                 ORDER BY changes_count DESC
                 LIMIT 10
             '''.format(days)).fetchall()
-            
+
             return {
                 'period_days': days,
                 'changes_by_type': [dict(row) for row in changes],
                 'most_active_chats': [dict(row) for row in active_chats]
             }
-    
+
     def close_scan_session(self, session_id: str, stats: Dict):
         """Закрывает сессию парсинга"""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('''
-                UPDATE scan_sessions SET 
-                    end_time = ?, 
-                    total_chats = ?, 
+                UPDATE scan_sessions SET
+                    end_time = ?,
+                    total_chats = ?,
                     total_messages = ?,
                     changes_detected = ?
                 WHERE id = ?
@@ -329,81 +335,81 @@ class TelegramDatabase:
                 stats.get('changes_detected', 0),
                 session_id
             ))
-        
+
         print(f"✅ Сессия {session_id} завершена")
-    
+
     def get_last_message_date(self, chat_id: int) -> Optional[str]:
         """Получает дату последнего сообщения в чате"""
         with sqlite3.connect(self.db_path) as conn:
             result = conn.execute('''
-                SELECT MAX(date) FROM messages 
+                SELECT MAX(date) FROM messages
                 WHERE chat_id = ? AND is_deleted = FALSE
             ''', (chat_id,)).fetchone()
-            
+
             return result[0] if result and result[0] else None
-    
+
     def get_cached_message_count(self, chat_id: int) -> int:
         """Получает количество кэшированных сообщений в чате"""
         with sqlite3.connect(self.db_path) as conn:
             result = conn.execute('''
-                SELECT COUNT(*) FROM messages 
+                SELECT COUNT(*) FROM messages
                 WHERE chat_id = ? AND is_deleted = FALSE
             ''', (chat_id,)).fetchone()
-            
+
             return result[0] if result else 0
-    
+
     def should_check_for_changes(self, chat_id: int, hours_threshold: int = 24) -> bool:
         """Определяет, нужно ли проверять изменения в чате"""
         with sqlite3.connect(self.db_path) as conn:
             result = conn.execute('''
-                SELECT MAX(timestamp) FROM message_history 
+                SELECT MAX(timestamp) FROM message_history
                 WHERE chat_id = ? AND action_type IN ('created', 'edited', 'deleted')
             ''', (chat_id,)).fetchone()
-            
+
             if not result or not result[0]:
                 return True
-                
+
             from datetime import datetime, timedelta
             last_check = datetime.fromisoformat(result[0])
             threshold = datetime.now() - timedelta(hours=hours_threshold)
-            
+
             return last_check < threshold
-    
+
     def get_parsing_statistics(self) -> Dict:
         """Получает статистику парсинга для мониторинга"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            
+
             # Общая статистика
             total_stats = conn.execute('''
-                SELECT 
+                SELECT
                     COUNT(DISTINCT chat_id) as total_chats,
                     COUNT(*) as total_messages,
                     COUNT(CASE WHEN is_deleted = TRUE THEN 1 END) as deleted_messages
                 FROM messages
             ''').fetchone()
-            
+
             # Статистика по последним сессиям
             recent_sessions = conn.execute('''
-                SELECT 
+                SELECT
                     id, start_time, end_time, total_chats, total_messages, changes_detected
-                FROM scan_sessions 
-                ORDER BY start_time DESC 
+                FROM scan_sessions
+                ORDER BY start_time DESC
                 LIMIT 5
             ''').fetchall()
-            
+
             # Активность по изменениям за последние дни
             recent_changes = conn.execute('''
-                SELECT 
+                SELECT
                     action_type,
                     COUNT(*) as count,
                     DATE(timestamp) as date
-                FROM message_history 
+                FROM message_history
                 WHERE timestamp > datetime('now', '-7 days')
                 GROUP BY action_type, DATE(timestamp)
                 ORDER BY date DESC, action_type
             ''').fetchall()
-            
+
             return {
                 'total_statistics': dict(total_stats) if total_stats else {},
                 'recent_sessions': [dict(row) for row in recent_sessions],

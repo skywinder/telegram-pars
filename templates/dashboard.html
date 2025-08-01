@@ -28,7 +28,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-3 mb-3">
         <div class="card bg-success text-white">
             <div class="card-body">
@@ -44,7 +44,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-3 mb-3">
         <div class="card bg-warning text-white">
             <div class="card-body">
@@ -66,7 +66,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-3 mb-3">
         <div class="card bg-info text-white">
             <div class="card-body">
@@ -83,6 +83,56 @@
                     </div>
                     <div class="align-self-center">
                         <i class="bi bi-bar-chart fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Мониторинг статуса -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-activity"></i> Мониторинг Статуса Парсинга
+                </h5>
+                <a href="{{ url_for('status_page') }}" class="btn btn-sm btn-light">
+                    Подробный статус <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-info">📊 Real-time Мониторинг</h6>
+                        <p class="mb-2">Отслеживайте прогресс парсинга в реальном времени</p>
+                        <ul class="list-unstyled small">
+                            <li><i class="bi bi-check2 text-success"></i> Текущий статус операций</li>
+                            <li><i class="bi bi-check2 text-success"></i> Прогресс обработки чатов</li>
+                            <li><i class="bi bi-check2 text-success"></i> Статистика API запросов</li>
+                            <li><i class="bi bi-check2 text-success"></i> Расчет времени завершения</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-info">🛑 Управление Операциями</h6>
+                        <p class="mb-2">Безопасное прерывание и контроль процессов</p>
+                        <ul class="list-unstyled small">
+                            <li><i class="bi bi-check2 text-success"></i> Изящное прерывание операций</li>
+                            <li><i class="bi bi-check2 text-success"></i> Сохранение прогресса</li>
+                            <li><i class="bi bi-check2 text-success"></i> Автоматическое обновление</li>
+                            <li><i class="bi bi-check2 text-success"></i> История операций</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="text-center mt-3">
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('status_page') }}" class="btn btn-info">
+                            <i class="bi bi-eye"></i> Открыть Мониторинг
+                        </a>
+                        <button type="button" class="btn btn-outline-info" onclick="openStatusMonitor()">
+                            <i class="bi bi-terminal"></i> CLI Мониторинг
+                        </button>
                     </div>
                 </div>
             </div>
@@ -138,7 +188,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('chat_detail', chat_id=chat.id) }}" 
+                                        <a href="{{ url_for('chat_detail', chat_id=chat.id) }}"
                                            class="btn btn-sm btn-outline-info">
                                             <i class="bi bi-eye"></i>
                                         </a>
@@ -157,7 +207,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Недавние изменения -->
     <div class="col-lg-4 mb-4">
         <div class="card">
@@ -188,7 +238,7 @@
                             <span class="badge bg-secondary">{{ change.count }}</span>
                         </div>
                     {% endfor %}
-                    
+
                     {% if changes_summary.most_active_chats %}
                         <hr>
                         <h6 class="text-muted">Активные чаты:</h6>
@@ -207,7 +257,7 @@
                 {% endif %}
             </div>
         </div>
-        
+
         <!-- Быстрые действия -->
         <div class="card mt-3">
             <div class="card-header">
@@ -286,4 +336,28 @@ new Chart(ctx, {
 });
 </script>
 {% endif %}
+
+<script>
+function openStatusMonitor() {
+    const message = `
+📊 CLI МОНИТОРИНГ СТАТУСА
+
+Для запуска терминального мониторинга выполните команду:
+
+python status_monitor.py
+
+Особенности CLI мониторинга:
+• Real-time обновления каждые 2 секунды
+• Визуальный прогресс-бар
+• Детальная статистика API запросов
+• Возможность изящного прерывания через Ctrl+C
+• Работает независимо от веб-интерфейса
+
+Убедитесь что веб-интерфейс запущен на порту 5000.
+    `;
+
+    alert(message);
+}
+</script>
+
 {% endblock %}
