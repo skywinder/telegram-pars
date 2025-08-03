@@ -285,23 +285,204 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Toastify для уведомлений -->
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
 <script>
+// Server-Sent Events для real-time уведомлений
+let eventSource = null;
+
+function connectToNotifications() {
+    if (eventSource) {
+        eventSource.close();
+    }
+    
+    eventSource = new EventSource('/api/monitor/stream');
+    
+    eventSource.onmessage = function(event) {
+        console.log('SSE message received:', event.data);
+        const data = JSON.parse(event.data);
+        console.log('Parsed data:', data);
+        
+        if (data.type === 'connected') {
+            showNotification('Подключено к потоку уведомлений', 'success');
+        } else if (data.type === 'message_edited') {
+            const message = `✏️ Сообщение изменено в чате "${data.data.chat_name}"`;
+            showNotification(message, 'warning', () => { refreshChanges(); });
+            // Браузерное уведомление
+            showBrowserNotification(
+                'Сообщение изменено',
+                `Чат: ${data.data.chat_name}\n${data.data.text || 'Без текста'}`,
+                '✏️'
+            );
+            // Добавляем звук
+            playNotificationSound();
+            // Обновляем список
+            setTimeout(refreshChanges, 1000);
+        } else if (data.type === 'message_deleted') {
+            const message = `🗑️ Сообщение удалено в чате "${data.data.chat_name}"`;
+            showNotification(message, 'error', () => { refreshChanges(); });
+            // Браузерное уведомление
+            showBrowserNotification(
+                'Сообщение удалено',
+                `Чат: ${data.data.chat_name}\nID: ${data.data.message_id}`,
+                '🗑️'
+            );
+            // Добавляем звук
+            playNotificationSound();
+            // Обновляем список
+            setTimeout(refreshChanges, 1000);
+        }
+    };
+    
+    eventSource.onerror = function(error) {
+        console.error('SSE Error:', error);
+        showNotification('Потеряно соединение с сервером', 'error');
+        // Переподключаемся через 5 секунд
+        setTimeout(connectToNotifications, 5000);
+    };
+}
+
+// Показ уведомлений
+function showNotification(message, type = 'info', onClick = null) {
+    const colors = {
+        'success': '#10b981',
+        'error': '#ef4444',
+        'warning': '#f59e0b',
+        'info': '#3b82f6'
+    };
+    
+    Toastify({
+        text: message,
+        duration: 5000,
+        gravity: "top",
+        position: "right",
+        backgroundColor: colors[type] || colors.info,
+        stopOnFocus: true,
+        onClick: onClick
+    }).showToast();
+}
+
+// Звук уведомления
+function playNotificationSound() {
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBi6I0fPTgjMGHm7A7+OZURE');
+    audio.volume = 0.3;
+    audio.play().catch(e => console.log('Не удалось воспроизвести звук:', e));
+}
+
 // Автообновление статуса
+let monitorIsActive = false;
+
 setInterval(async function() {
     try {
         const response = await fetch('/api/monitor/status');
         const data = await response.json();
         
         const statusEl = document.getElementById('monitor-status');
+        const wasActive = monitorIsActive;
+        monitorIsActive = data.is_active;
+        
         if (data.is_active) {
-            statusEl.innerHTML = `<span class="badge bg-success"><i class="bi bi-circle-fill"></i> Активен</span>`;
+            statusEl.innerHTML = `<span class="badge bg-success fs-6"><i class="bi bi-circle-fill"></i> Активен</span>`;
+            
+            // Если мониторинг только что активировался, подключаемся к уведомлениям
+            if (!wasActive && eventSource === null) {
+                connectToNotifications();
+            }
         } else {
-            statusEl.innerHTML = `<span class="badge bg-secondary"><i class="bi bi-circle"></i> Неактивен</span>`;
+            statusEl.innerHTML = `<span class="badge bg-secondary fs-6"><i class="bi bi-circle"></i> Неактивен</span>`;
+            statusEl.innerHTML += `<button class="btn btn-sm btn-primary ms-2" onclick="showMonitoringInstructions()">
+                <i class="bi bi-play-circle"></i> Как включить
+            </button>`;
         }
     } catch (error) {
         console.error('Error updating status:', error);
     }
 }, 5000);
+
+// Показ инструкций
+function showMonitoringInstructions() {
+    const modal = `
+        <div class="modal fade" id="instructionsModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Как включить мониторинг</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <h6>Для включения мониторинга:</h6>
+                        <ol>
+                            <li>Откройте терминал/командную строку</li>
+                            <li>Запустите: <code>python main.py</code></li>
+                            <li>Выберите пункт <strong>10</strong> в главном меню</li>
+                            <li>Выберите <strong>1</strong> для мониторинга всех чатов или <strong>2</strong> для выбранных</li>
+                        </ol>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> После запуска мониторинга статус автоматически изменится на "Активен"
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modal);
+    const modalEl = new bootstrap.Modal(document.getElementById('instructionsModal'));
+    modalEl.show();
+    
+    // Удаляем модальное окно после закрытия
+    document.getElementById('instructionsModal').addEventListener('hidden.bs.modal', function() {
+        this.remove();
+    });
+}
+
+// Браузерные уведомления
+function requestNotificationPermission() {
+    if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission().then(function (permission) {
+            if (permission === "granted") {
+                showNotification("Уведомления включены!", "success");
+            }
+        });
+    }
+}
+
+function showBrowserNotification(title, body, icon = '🔔') {
+    if ("Notification" in window && Notification.permission === "granted") {
+        const notification = new Notification(title, {
+            body: body,
+            icon: `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">${icon}</text></svg>`,
+            badge: `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">${icon}</text></svg>`
+        });
+        
+        notification.onclick = function() {
+            window.focus();
+            refreshChanges();
+            notification.close();
+        };
+    }
+}
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    // Запрашиваем разрешение на уведомления
+    requestNotificationPermission();
+    
+    // Проверяем статус мониторинга
+    fetch('/api/monitor/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.is_active) {
+                monitorIsActive = true;
+                connectToNotifications();
+            }
+        });
+});
 
 // Фильтрация изменений
 document.getElementById('typeFilter').addEventListener('change', filterChanges);

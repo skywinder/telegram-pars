@@ -69,11 +69,21 @@ class RealtimeMonitor:
                     )
                 
                 # Вызываем callbacks
-                await self._notify_callbacks('message_edited', {
+                change_data = {
                     'chat_id': event.chat_id,
                     'message_id': event.message.id,
                     'message': message_data,
                     'timestamp': datetime.now()
+                }
+                await self._notify_callbacks('message_edited', change_data)
+                
+                # Отправляем уведомление через менеджер
+                notification_manager = get_notification_manager()
+                notification_manager.notify('message_edited', {
+                    'chat_id': event.chat_id,
+                    'chat_name': (await self._get_chat_info(event.chat_id)).get('name', 'Unknown'),
+                    'message_id': event.message.id,
+                    'text': message_data.get('text', '')[:100] + ('...' if message_data.get('text', '') and len(message_data.get('text', '')) > 100 else '')
                 })
                 
             except Exception as e:
@@ -106,6 +116,14 @@ class RealtimeMonitor:
                         'chat_id': event.chat_id,
                         'message_id': message_id,
                         'timestamp': datetime.now()
+                    })
+                    
+                    # Отправляем уведомление через менеджер
+                    notification_manager = get_notification_manager()
+                    notification_manager.notify('message_deleted', {
+                        'chat_id': event.chat_id,
+                        'chat_name': (await self._get_chat_info(event.chat_id)).get('name', 'Unknown'),
+                        'message_id': message_id
                     })
                     
             except Exception as e:

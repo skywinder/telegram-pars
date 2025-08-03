@@ -7,13 +7,16 @@ import json
 import sqlite3
 import asyncio
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, Response
 from analytics import TelegramAnalytics
 from ai_exporter import AIExporter
 from database import TelegramDatabase
 from status_manager import StatusManager
 import config
 from realtime_monitor import get_monitor_instance
+from notification_manager import get_notification_manager
+from queue import Queue, Empty
+import time
 
 # Создаем Flask приложение
 app = Flask(__name__)
@@ -945,6 +948,55 @@ def api_monitor_recent_changes():
         return jsonify({'changes': changes})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/monitor/stream')
+def monitor_stream():
+    """Server-Sent Events для real-time уведомлений"""
+    def generate():
+        # Создаем очередь для этого клиента
+        client_queue = Queue()
+        notification_manager = get_notification_manager()
+        notification_manager.add_listener(client_queue)
+        
+        try:
+            # Отправляем начальное сообщение
+            yield f"data: {json.dumps({'type': 'connected', 'message': 'Подключено к потоку уведомлений'})}\n\n"
+            
+            while True:
+                try:
+                    # Ждем событие с таймаутом
+                    event = client_queue.get(timeout=30)
+                    yield f"data: {event}\n\n"
+                except Empty:
+                    # Отправляем heartbeat каждые 30 секунд
+                    yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+                    
+        except GeneratorExit:
+            # Клиент отключился
+            notification_manager.remove_listener(client_queue)
+            
+    return Response(generate(), mimetype="text/event-stream")
+
+@app.route('/api/monitor/control', methods=['POST'])
+def monitor_control():
+    """API для управления мониторингом из веб-интерфейса"""
+    data = request.get_json()
+    action = data.get('action')
+    
+    # Здесь пока просто возвращаем сообщение
+    # В будущем можно добавить управление через отдельный процесс
+    if action == 'start':
+        return jsonify({
+            'success': False,
+            'message': 'Для запуска мониторинга используйте консольное приложение (python main.py → пункт 10)'
+        })
+    elif action == 'stop':
+        return jsonify({
+            'success': False,
+            'message': 'Для остановки мониторинга используйте консольное приложение'
+        })
+    else:
+        return jsonify({'error': 'Неизвестное действие'}), 400
 
 if __name__ == '__main__':
     print("🌐 Запуск веб-интерфейса Telegram Parser...")
