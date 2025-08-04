@@ -11,6 +11,7 @@ from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto
 from database import TelegramDatabase
 import config
 from notification_manager import get_notification_manager
+from json_utils import safe_json_dumps
 
 # Настройка логирования
 logger = logging.getLogger('realtime_monitor')
@@ -134,8 +135,8 @@ class RealtimeMonitor:
         data = {
             'id': message.id,
             'text': message.text or message.message,
-            'date': message.date,
-            'edit_date': message.edit_date,
+            'date': message.date.isoformat() if message.date else None,
+            'edit_date': message.edit_date.isoformat() if message.edit_date else None,
             'from_id': message.from_id.user_id if message.from_id else None,
             'views': message.views,
             'forwards': message.forwards,
@@ -176,7 +177,6 @@ class RealtimeMonitor:
             # Получаем информацию о чате
             chat_info = await self._get_chat_info(chat_id)
             
-            import json
             import sqlite3
             
             with sqlite3.connect(self.db.db_path) as conn:
@@ -185,8 +185,8 @@ class RealtimeMonitor:
                     chat_id,
                     message_id,
                     action_type,
-                    json.dumps(old_content, ensure_ascii=False) if old_content else None,
-                    json.dumps(new_content, ensure_ascii=False) if new_content else None,
+                    safe_json_dumps(old_content) if old_content else None,
+                    safe_json_dumps(new_content) if new_content else None,
                     datetime.now().isoformat(),
                     new_content.get('from_id') if new_content else 
                         old_content.get('from_id') if old_content else None,

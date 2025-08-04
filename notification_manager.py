@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import List, Dict, Any
 from queue import Queue
 import threading
+from json_utils import safe_json_dumps
 
 class NotificationManager:
     """Управляет уведомлениями и очередью событий"""
@@ -45,7 +46,7 @@ class NotificationManager:
             dead_listeners = []
             for listener_queue in self.listeners:
                 try:
-                    listener_queue.put_nowait(json.dumps(event))
+                    listener_queue.put_nowait(safe_json_dumps(event))
                 except:
                     # Если не удалось отправить, помечаем для удаления
                     dead_listeners.append(listener_queue)

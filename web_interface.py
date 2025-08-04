@@ -17,6 +17,7 @@ from realtime_monitor import get_monitor_instance
 from notification_manager import get_notification_manager
 from queue import Queue, Empty
 import time
+from json_utils import safe_json_dumps
 
 # Создаем Flask приложение
 app = Flask(__name__)
@@ -960,7 +961,7 @@ def monitor_stream():
         
         try:
             # Отправляем начальное сообщение
-            yield f"data: {json.dumps({'type': 'connected', 'message': 'Подключено к потоку уведомлений'})}\n\n"
+            yield f"data: {safe_json_dumps({'type': 'connected', 'message': 'Подключено к потоку уведомлений'})}\n\n"
             
             while True:
                 try:
@@ -969,7 +970,7 @@ def monitor_stream():
                     yield f"data: {event}\n\n"
                 except Empty:
                     # Отправляем heartbeat каждые 30 секунд
-                    yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+                    yield f"data: {safe_json_dumps({'type': 'heartbeat'})}\n\n"
                     
         except GeneratorExit:
             # Клиент отключился
