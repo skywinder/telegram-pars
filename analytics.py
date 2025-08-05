@@ -252,6 +252,26 @@ class TelegramAnalytics:
                 'recent_activity': [dict(row) for row in recent_changes]
             }
     
+    def get_all_chats(self) -> List[Dict]:
+        """
+        Получает список всех чатов
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            chats = conn.execute('''
+                SELECT 
+                    c.id as chat_id,
+                    c.name as chat_name,
+                    c.type as chat_type,
+                    COUNT(DISTINCT m.id) as message_count
+                FROM chats c
+                LEFT JOIN messages m ON c.id = m.chat_id
+                GROUP BY c.id
+                ORDER BY c.name
+            ''').fetchall()
+            
+            return [dict(chat) for chat in chats]
+    
     def get_chat_changes_count(self, chat_id: int) -> int:
         """
         Получает количество изменений для конкретного чата

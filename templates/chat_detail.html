@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ report.chat_info.name }} - Telegram Parser{% endblock %}
+{% block title %}{{ report.chat_info['name'] }} - Telegram Parser{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -8,17 +8,17 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h1>
-                    {% if report.chat_info.type == 'User' %}
+                    {% if report.chat_info['type'] == 'User' %}
                         <i class="bi bi-person-circle text-success"></i>
-                    {% elif report.chat_info.type == 'Chat' %}
+                    {% elif report.chat_info['type'] == 'Chat' %}
                         <i class="bi bi-people-fill text-info"></i>
-                    {% elif report.chat_info.type == 'Channel' %}
+                    {% elif report.chat_info['type'] == 'Channel' %}
                         <i class="bi bi-broadcast text-warning"></i>
                     {% endif %}
-                    {{ report.chat_info.name }}
+                    {{ report.chat_info['name'] }}
                 </h1>
                 <p class="lead text-muted mb-0">
-                    {{ report.chat_info.type }} • ID: {{ chat_id }}
+                    {{ report.chat_info['type'] }} • ID: {{ chat_id }}
                 </p>
             </div>
             <div>

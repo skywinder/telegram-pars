@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+
+{% block title %}Помощь - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="bi bi-question-circle"></i> Помощь и документация
+            </h1>
+        </div>
+    </div>
+
+    <!-- Навигация по разделам -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Быстрая навигация</h5>
+                    <div class="btn-group flex-wrap" role="group">
+                        <a href="#parsing" class="btn btn-outline-primary">
+                            <i class="bi bi-download"></i> Парсинг
+                        </a>
+                        <a href="#monitoring" class="btn btn-outline-warning">
+                            <i class="bi bi-broadcast"></i> Мониторинг
+                        </a>
+                        <a href="#processes" class="btn btn-outline-info">
+                            <i class="bi bi-cpu"></i> Фоновые процессы
+                        </a>
+                        <a href="#faq" class="btn btn-outline-secondary">
+                            <i class="bi bi-patch-question"></i> FAQ
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Раздел: Парсинг -->
+    <div class="row mb-4" id="parsing">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-download"></i> Парсинг и синхронизация
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <h5>Что такое парсинг?</h5>
+                    <p>Парсинг - это процесс загрузки и сохранения сообщений из ваших Telegram чатов в локальную базу данных для последующего анализа.</p>
+                    
+                    <h5 class="mt-4">Типы парсинга</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card bg-light mb-3">
+                                <div class="card-body">
+                                    <h6 class="text-success">
+                                        <i class="bi bi-arrow-clockwise"></i> Проверка изменений
+                                    </h6>
+                                    <p class="small mb-2">Быстрый режим для регулярного использования.</p>
+                                    <ul class="small mb-0">
+                                        <li>Проверяет только новые сообщения</li>
+                                        <li>Ищет изменения в существующих сообщениях</li>
+                                        <li>Занимает меньше времени</li>
+                                        <li>Экономит трафик и ресурсы</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light mb-3">
+                                <div class="card-body">
+                                    <h6 class="text-primary">
+                                        <i class="bi bi-download"></i> Полная синхронизация
+                                    </h6>
+                                    <p class="small mb-2">Полная загрузка всех данных.</p>
+                                    <ul class="small mb-0">
+                                        <li>Загружает все сообщения заново</li>
+                                        <li>Обновляет всю историю чатов</li>
+                                        <li>Требует больше времени</li>
+                                        <li>Используйте при первом запуске</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h5 class="mt-4">Как происходит парсинг?</h5>
+                    <ol>
+                        <li><strong>Подключение к Telegram</strong> - парсер использует ваши учетные данные для подключения к API</li>
+                        <li><strong>Получение списка чатов</strong> - загружается список всех доступных чатов</li>
+                        <li><strong>Обработка каждого чата</strong>:
+                            <ul>
+                                <li>Загрузка информации о чате</li>
+                                <li>Получение списка участников (для групп)</li>
+                                <li>Загрузка сообщений пакетами</li>
+                                <li>Сохранение в базу данных</li>
+                            </ul>
+                        </li>
+                        <li><strong>Обработка изменений</strong> - сравнение с сохраненными данными и фиксация изменений</li>
+                    </ol>
+
+                    <div class="alert alert-info mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Совет:</strong> Используйте "Проверку изменений" для ежедневного обновления и "Полную синхронизацию" только при необходимости.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Раздел: Мониторинг -->
+    <div class="row mb-4" id="monitoring">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h4 class="mb-0">
+                        <i class="bi bi-broadcast"></i> Мониторинг изменений
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <h5>Что такое мониторинг?</h5>
+                    <p>Мониторинг - это непрерывное отслеживание изменений в сообщениях (редактирование, удаление) в реальном времени.</p>
+                    
+                    <h5 class="mt-4">Что отслеживает мониторинг?</h5>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card text-center mb-3">
+                                <div class="card-body">
+                                    <i class="bi bi-pencil-square text-warning fs-1"></i>
+                                    <h6 class="mt-2">Редактирование</h6>
+                                    <p class="small mb-0">Когда пользователи изменяют текст сообщений</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-center mb-3">
+                                <div class="card-body">
+                                    <i class="bi bi-trash text-danger fs-1"></i>
+                                    <h6 class="mt-2">Удаление</h6>
+                                    <p class="small mb-0">Когда сообщения удаляются из чата</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-center mb-3">
+                                <div class="card-body">
+                                    <i class="bi bi-plus-circle text-success fs-1"></i>
+                                    <h6 class="mt-2">Новые сообщения</h6>
+                                    <p class="small mb-0">Появление новых сообщений в чатах</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h5 class="mt-4">Как запустить мониторинг?</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Через веб-интерфейс:</h6>
+                            <ol>
+                                <li>Откройте <a href="{{ url_for('control_panel') }}">Панель управления</a></li>
+                                <li>Нажмите "Запустить" в блоке "Мониторинг"</li>
+                                <li>Выберите режим (все чаты или конкретные)</li>
+                                <li>Следите за изменениями на <a href="{{ url_for('realtime_monitor_page') }}">странице мониторинга</a></li>
+                            </ol>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Через консоль:</h6>
+                            <ol>
+                                <li>Запустите <code>python main.py</code></li>
+                                <li>Выберите пункт <strong>10</strong> в меню</li>
+                                <li>Выберите режим мониторинга</li>
+                                <li>Мониторинг будет работать в фоне</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning mt-3">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Важно:</strong> Мониторинг потребляет ресурсы и интернет-трафик. Используйте его только когда необходимо отслеживать изменения.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Раздел: Фоновые процессы -->
+    <div class="row mb-4" id="processes">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-cpu"></i> Фоновые процессы
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <h5>Что происходит в фоне?</h5>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Процесс</th>
+                                    <th>Описание</th>
+                                    <th>Когда работает</th>
+                                    <th>Ресурсы</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>API соединение</strong></td>
+                                    <td>Поддержание связи с Telegram серверами</td>
+                                    <td>Всегда при работе парсера</td>
+                                    <td>Минимальные</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Загрузка сообщений</strong></td>
+                                    <td>Получение сообщений из чатов пакетами</td>
+                                    <td>Во время парсинга</td>
+                                    <td>Зависит от объема</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Сохранение в БД</strong></td>
+                                    <td>Запись данных в SQLite базу</td>
+                                    <td>После загрузки пакета</td>
+                                    <td>Диск, процессор</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Проверка изменений</strong></td>
+                                    <td>Сравнение новых данных с сохраненными</td>
+                                    <td>При мониторинге</td>
+                                    <td>Процессор, память</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Обработка FloodWait</strong></td>
+                                    <td>Ожидание при превышении лимитов API</td>
+                                    <td>При ошибках 429</td>
+                                    <td>Только ожидание</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h5 class="mt-4">Индикаторы состояния</h5>
+                    <ul>
+                        <li><span class="badge bg-success">Активен</span> - процесс работает нормально</li>
+                        <li><span class="badge bg-warning">Ожидание</span> - временная пауза (FloodWait)</li>
+                        <li><span class="badge bg-danger">Ошибка</span> - требуется вмешательство</li>
+                        <li><span class="badge bg-secondary">Неактивен</span> - процесс остановлен</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Раздел: FAQ -->
+    <div class="row mb-4" id="faq">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-patch-question"></i> Часто задаваемые вопросы
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="faqAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                    Сколько времени занимает парсинг?
+                                </button>
+                            </h2>
+                            <div id="faq1" class="accordion-collapse collapse">
+                                <div class="accordion-body">
+                                    Зависит от количества чатов и сообщений:
+                                    <ul>
+                                        <li>Проверка изменений: 5-30 минут</li>
+                                        <li>Полная синхронизация: от 30 минут до нескольких часов</li>
+                                        <li>Один чат: 1-10 минут</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                    Что такое FloodWait?
+                                </button>
+                            </h2>
+                            <div id="faq2" class="accordion-collapse collapse">
+                                <div class="accordion-body">
+                                    FloodWait - это ограничение Telegram API на количество запросов. Когда вы превышаете лимит, 
+                                    сервер требует подождать определенное время (обычно от нескольких секунд до минут). 
+                                    Парсер автоматически обрабатывает эти ситуации и продолжает работу после ожидания.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                    Можно ли запускать парсинг и мониторинг одновременно?
+                                </button>
+                            </h2>
+                            <div id="faq3" class="accordion-collapse collapse">
+                                <div class="accordion-body">
+                                    Технически возможно, но не рекомендуется. Оба процесса используют одно API соединение 
+                                    и могут конфликтовать. Лучше сначала выполнить парсинг, а затем запустить мониторинг.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                                    Где хранятся данные?
+                                </button>
+                            </h2>
+                            <div id="faq4" class="accordion-collapse collapse">
+                                <div class="accordion-body">
+                                    Все данные хранятся локально в SQLite базе данных в папке <code>output/telegram_data.db</code>. 
+                                    Сессия Telegram сохраняется в файле <code>telegram_parser_session.session</code>.
+                                    Никакие данные не отправляются на внешние серверы.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
+                                    Безопасно ли это?
+                                </button>
+                            </h2>
+                            <div id="faq5" class="accordion-collapse collapse">
+                                <div class="accordion-body">
+                                    Да, если вы соблюдаете меры предосторожности:
+                                    <ul>
+                                        <li>Не передавайте файл сессии третьим лицам</li>
+                                        <li>Используйте двухфакторную аутентификацию в Telegram</li>
+                                        <li>Храните базу данных в безопасном месте</li>
+                                        <li>Регулярно проверяйте активные сессии в настройках Telegram</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.accordion-button:not(.collapsed) {
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}

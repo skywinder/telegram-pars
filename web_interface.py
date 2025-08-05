@@ -1308,8 +1308,14 @@ def control_panel():
     """Страница панели управления"""
     # Получаем список чатов для селекторов
     chats = []
-    if db:
-        chats = db.get_all_chats()
+    if analytics:
+        try:
+            raw_chats = analytics.get_most_active_chats(limit=1000)
+            # Преобразуем к формату, ожидаемому шаблоном
+            chats = [{'id': chat['chat_id'], 'name': chat['chat_name']} for chat in raw_chats]
+        except Exception as e:
+            print(f"Error getting chats: {e}")
+            chats = []
     
     # Получаем размер БД
     db_size = 0
@@ -1323,6 +1329,11 @@ def control_panel():
                          chats=chats,
                          db_size=db_size,
                          phone_number=phone_number)
+
+@app.route('/help')
+def help_page():
+    """Страница помощи"""
+    return render_template('help.html')
 
 @app.route('/api/parser/status')
 def parser_status():
@@ -1465,6 +1476,103 @@ def clear_cache():
     """Очистка кэша"""
     # TODO: Реализовать очистку кэша
     return jsonify({'success': True, 'message': 'Кэш очищен'})
+
+@app.route('/api/stats/summary')
+def api_stats_summary():
+    """API для получения общей статистики для навбара"""
+    if not analytics:
+        return jsonify({'success': False, 'error': 'База данных недоступна'})
+    
+    try:
+        with sqlite3.connect(analytics.db_path) as conn:
+            # Получаем общую статистику
+            total_chats = conn.execute('SELECT COUNT(*) FROM chats').fetchone()[0]
+            total_messages = conn.execute('SELECT COUNT(*) FROM messages').fetchone()[0]
+            total_changes = conn.execute('SELECT COUNT(*) FROM message_history').fetchone()[0]
+            
+            return jsonify({
+                'success': True,
+                'total_chats': total_chats,
+                'total_messages': total_messages,
+                'total_changes': total_changes
+            })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/chats/search')
+def api_chats_search():
+    """API для поиска чатов"""
+    if not analytics:
+        return jsonify({'success': False, 'error': 'База данных недоступна'})
+    
+    query = request.args.get('q', '').strip()
+    if len(query) < 2:
+        return jsonify({'success': True, 'results': []})
+    
+    try:
+        with sqlite3.connect(analytics.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            # Ищем чаты по имени
+            results = conn.execute('''
+                SELECT 
+                    c.id,
+                    c.name,
+                    c.type,
+                    COUNT(DISTINCT m.id) as message_count
+                FROM chats c
+                LEFT JOIN messages m ON c.id = m.chat_id
+                WHERE LOWER(c.name) LIKE LOWER(?)
+                GROUP BY c.id
+                ORDER BY message_count DESC
+                LIMIT 10
+            ''', (f'%{query}%',)).fetchall()
+            
+            return jsonify({
+                'success': True,
+                'results': [dict(row) for row in results]
+            })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/chat-list')
+def api_chat_list():
+    """API для получения списка всех чатов с полной статистикой"""
+    if not analytics:
+        return jsonify({'success': False, 'error': 'База данных недоступна'})
+    
+    try:
+        # Получаем список всех чатов
+        chats = analytics.get_all_chats()
+        
+        # Обогащаем данные статистикой
+        enriched_chats = []
+        for chat in chats:
+            chat_id = chat['chat_id']
+            # Получаем статистику для каждого чата
+            stats = analytics.get_chat_statistics(chat_id)
+            
+            enriched_chat = {
+                'id': chat_id,
+                'name': chat['chat_name'],
+                'type': chat['chat_type'],
+                'message_count': stats.get('total_messages', 0),
+                'unique_users': stats.get('unique_users', 0),
+                'last_message_date': stats.get('last_message_date', ''),
+                'active_days': stats.get('active_days', 0),
+                'avg_messages_per_day': round(stats.get('avg_messages_per_day', 0), 1),
+                'edited_count': stats.get('edited_count', 0),
+                'deleted_count': stats.get('deleted_count', 0),
+                'changes_count': analytics.get_chat_changes_count(chat_id)
+            }
+            enriched_chats.append(enriched_chat)
+        
+        return jsonify({
+            'success': True,
+            'chats': enriched_chats
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/recent-chat/remove/<int:chat_id>', methods=['POST'])
 def remove_recent_chat(chat_id):

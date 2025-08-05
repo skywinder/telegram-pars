@@ -11,6 +11,57 @@
     </div>
 </div>
 
+<!-- Быстрый поиск чатов -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-search"></i> Быстрый поиск и навигация
+                </h5>
+                <div class="row">
+                    <div class="col-lg-8 mx-auto">
+                        <div class="input-group input-group-lg mb-3">
+                            <span class="input-group-text bg-primary text-white">
+                                <i class="bi bi-search"></i>
+                            </span>
+                            <input type="text" class="form-control" id="mainChatSearch" 
+                                   placeholder="Начните вводить название чата..." 
+                                   autocomplete="off">
+                            <button class="btn btn-primary" type="button" id="mainSearchBtn">
+                                Поиск
+                            </button>
+                        </div>
+                        
+                        <!-- Быстрые фильтры -->
+                        <div class="text-center mb-3">
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-outline-primary btn-sm active" onclick="filterMainChats('all')">
+                                    <i class="bi bi-chat-dots"></i> Все чаты
+                                </button>
+                                <button type="button" class="btn btn-outline-success btn-sm" onclick="filterMainChats('User')">
+                                    <i class="bi bi-person"></i> Личные
+                                </button>
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="filterMainChats('Chat')">
+                                    <i class="bi bi-people"></i> Группы
+                                </button>
+                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="filterMainChats('Channel')">
+                                    <i class="bi bi-broadcast"></i> Каналы
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Результаты поиска -->
+                        <div id="mainSearchResults" style="display: none;">
+                            <div class="list-group shadow" style="max-height: 400px; overflow-y: auto;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Статистические карточки -->
 <div class="row mb-4">
     <div class="col-md-3 mb-3">
@@ -224,6 +275,7 @@
                 </div>
             </div>
             <div class="card-body">
+                <!-- Активный процесс -->
                 <div class="row mb-3">
                     <div class="col-12">
                         <div id="activeProcessInfo" class="alert alert-info mb-3" style="display: none;">
@@ -233,6 +285,8 @@
                                     <strong>Активный процесс:</strong> <span id="activeProcessName">-</span>
                                     <br>
                                     <small>Текущий чат: <span id="currentChatName">-</span></small>
+                                    <br>
+                                    <small class="text-muted" id="processDescription">-</small>
                                 </div>
                                 <div>
                                     <span id="processProgress">-</span>
@@ -241,37 +295,169 @@
                         </div>
                     </div>
                 </div>
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6 class="text-info">📊 Статус Парсинга</h6>
-                        <p class="mb-2">Просматривайте текущий прогресс синхронизации в реальном времени</p>
-                        <a href="{{ url_for('status_page') }}" class="btn btn-sm btn-info">
-                            <i class="bi bi-eye"></i> Открыть статус парсинга
-                        </a>
-                        <p class="mt-2 mb-0"><small class="text-muted">Показывает какой чат сейчас обрабатывается и прогресс</small></p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6 class="text-warning">🔍 Мониторинг Изменений</h6>
-                        <p class="mb-2">Отслеживайте изменения сообщений в реальном времени</p>
-                        <a href="{{ url_for('realtime_monitor_page') }}" class="btn btn-sm btn-warning">
-                            <i class="bi bi-broadcast"></i> Запустить мониторинг
-                        </a>
-                        <p class="mt-2 mb-0"><small class="text-muted">Следит за редактированием и удалением сообщений</small></p>
+                
+                <!-- Объяснение процессов -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="accordion" id="processExplanation">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseExplanation">
+                                        <i class="bi bi-question-circle me-2"></i> Что происходит в фоне?
+                                    </button>
+                                </h2>
+                                <div id="collapseExplanation" class="accordion-collapse collapse">
+                                    <div class="accordion-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6 class="text-primary">🔄 Синхронизация (Парсинг)</h6>
+                                                <p class="small">Процесс загрузки сообщений из Telegram:</p>
+                                                <ul class="small">
+                                                    <li><strong>Проверка изменений</strong> - быстро проверяет только новые сообщения и изменения</li>
+                                                    <li><strong>Полная синхронизация</strong> - загружает все сообщения из всех чатов</li>
+                                                    <li><strong>Синхронизация чата</strong> - обновляет конкретный чат</li>
+                                                </ul>
+                                                <p class="small text-muted mb-0">Во время синхронизации парсер подключается к Telegram API и последовательно обрабатывает каждый чат.</p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6 class="text-warning">📡 Мониторинг изменений</h6>
+                                                <p class="small">Непрерывное отслеживание изменений в реальном времени:</p>
+                                                <ul class="small">
+                                                    <li><strong>Редактирование</strong> - отслеживает когда сообщения изменяются</li>
+                                                    <li><strong>Удаление</strong> - фиксирует удаленные сообщения</li>
+                                                    <li><strong>Новые сообщения</strong> - обнаруживает новые сообщения</li>
+                                                </ul>
+                                                <p class="small text-muted mb-0">Мониторинг работает в фоне и проверяет изменения каждые несколько минут.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+                
+                <!-- Статусы процессов -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="text-info">📊 Парсинг/Синхронизация</h6>
+                                <div id="parsingStatusDetails" class="mb-3">
+                                    <div class="text-muted small">Загрузка статуса...</div>
+                                </div>
+                                <div class="d-grid gap-2">
+                                    <a href="{{ url_for('status_page') }}" class="btn btn-sm btn-info">
+                                        <i class="bi bi-eye"></i> Детальный статус
+                                    </a>
+                                    <a href="{{ url_for('control_panel') }}" class="btn btn-sm btn-outline-info">
+                                        <i class="bi bi-gear"></i> Управление
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="text-warning">🔍 Мониторинг изменений</h6>
+                                <div id="monitoringStatusDetails" class="mb-3">
+                                    <div class="text-muted small">Загрузка статуса...</div>
+                                </div>
+                                <div class="d-grid gap-2">
+                                    <a href="{{ url_for('realtime_monitor_page') }}" class="btn btn-sm btn-warning">
+                                        <i class="bi bi-broadcast"></i> Страница мониторинга
+                                    </a>
+                                    <button class="btn btn-sm btn-outline-warning" onclick="toggleMonitoring()" id="monitorToggleBtn">
+                                        <i class="bi bi-play-fill"></i> Запустить
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <hr>
+                
+                <!-- Быстрые действия -->
                 <div class="text-center">
-                    <h6 class="text-muted mb-3">Управление процессами</h6>
+                    <h6 class="text-muted mb-3">Быстрые действия</h6>
                     <div class="btn-group" role="group">
-                        <button class="btn btn-success" onclick="startQuickParsing('check_changes')">
+                        <button class="btn btn-success" onclick="startQuickParsing('check_changes')" title="Быстрая проверка новых сообщений и изменений">
                             <i class="bi bi-arrow-clockwise"></i> Проверить изменения
                         </button>
-                        <button class="btn btn-primary" onclick="startQuickParsing('all')">
+                        <button class="btn btn-primary" onclick="startQuickParsing('all')" title="Полная загрузка всех сообщений">
                             <i class="bi bi-download"></i> Полная синхронизация
                         </button>
-                        <a href="{{ url_for('control_panel') }}" class="btn btn-secondary">
-                            <i class="bi bi-gear"></i> Панель управления
-                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Полный список чатов с поиском -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-chat-dots"></i> Все чаты
+                    </h5>
+                    <div class="d-flex align-items-center">
+                        <span class="me-3" id="chatCountInfo">
+                            <span class="badge bg-light text-dark">0</span> чатов
+                        </span>
+                        <button class="btn btn-sm btn-light" onclick="toggleChatView()">
+                            <i class="bi bi-grid-3x3-gap" id="viewToggleIcon"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Фильтры и поиск -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-search"></i>
+                            </span>
+                            <input type="text" class="form-control" id="chatSearchInput" 
+                                   placeholder="Поиск по названию..." 
+                                   onkeyup="filterChats()">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="chatTypeFilter" onchange="filterChats()">
+                            <option value="">Все типы</option>
+                            <option value="User">👤 Личные чаты</option>
+                            <option value="Chat">👥 Группы</option>
+                            <option value="Channel">📢 Каналы</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="chatSortBy" onchange="sortChats()">
+                            <option value="messages">📊 По сообщениям</option>
+                            <option value="recent">🕐 По активности</option>
+                            <option value="name">🔤 По имени</option>
+                            <option value="changes">✏️ По изменениям</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-outline-secondary w-100" onclick="resetFilters()">
+                            <i class="bi bi-x-circle"></i> Сбросить
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Список чатов -->
+                <div id="chatListContainer" style="max-height: 600px; overflow-y: auto;">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Загрузка...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Загрузка чатов...</p>
                     </div>
                 </div>
             </div>
@@ -281,7 +467,7 @@
 
 <div class="row">
     <!-- Топ чатов -->
-    <div class="col-lg-8 mb-4">
+    <div class="col-lg-8 mb-4" style="display: none;">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
@@ -456,15 +642,17 @@
 
 {% block scripts %}
 <script>
-// Проверка статуса синхронизации
+// Проверка статуса синхронизации и мониторинга
 async function checkSyncStatus() {
     try {
+        // Проверяем статус парсинга
         const response = await fetch('/api/status');
         const data = await response.json();
         
         const statusText = document.getElementById('syncStatusText');
         const spinner = document.querySelector('#currentSyncStatus .spinner-border');
         const processInfo = document.getElementById('activeProcessInfo');
+        const parsingDetails = document.getElementById('parsingStatusDetails');
         
         if (data.status === 'success' && data.data && data.data.is_active) {
             // Есть активный процесс
@@ -473,12 +661,24 @@ async function checkSyncStatus() {
             
             // Показываем информацию о процессе
             processInfo.style.display = 'block';
-            document.getElementById('activeProcessName').textContent = data.data.current_operation || 'Неизвестная операция';
+            const operation = data.data.current_operation || 'Неизвестная операция';
+            document.getElementById('activeProcessName').textContent = operation;
+            
+            // Добавляем описание процесса
+            let description = '';
+            if (operation.includes('check_changes')) {
+                description = 'Проверка новых сообщений и изменений в существующих';
+            } else if (operation.includes('full_scan')) {
+                description = 'Полная загрузка всех сообщений из всех чатов';
+            } else if (operation.includes('single_chat')) {
+                description = 'Синхронизация конкретного чата';
+            }
+            document.getElementById('processDescription').textContent = description;
             
             if (data.data.current_chat) {
                 document.getElementById('currentChatName').textContent = data.data.current_chat.name || 'Неизвестный чат';
             } else {
-                document.getElementById('currentChatName').textContent = '-';
+                document.getElementById('currentChatName').textContent = 'Подготовка...';
             }
             
             if (data.data.progress) {
@@ -497,21 +697,364 @@ async function checkSyncStatus() {
                 
                 document.getElementById('processProgress').textContent = progressText || 'Обработка...';
             }
+            
+            // Обновляем детали парсинга
+            parsingDetails.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="badge bg-success">Активен</span>
+                    <small>${operation}</small>
+                </div>
+                ${data.data.session_statistics ? `
+                    <small class="text-muted d-block mt-1">
+                        Сохранено: ${data.data.session_statistics.messages_saved || 0} сообщений
+                    </small>
+                ` : ''}
+            `;
         } else {
             // Нет активных процессов
             spinner.style.display = 'none';
             statusText.textContent = 'Нет активных процессов';
             processInfo.style.display = 'none';
+            
+            parsingDetails.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="badge bg-secondary">Неактивен</span>
+                    <small>Нет активных операций</small>
+                </div>
+                <small class="text-muted d-block mt-1">
+                    Запустите синхронизацию для обновления данных
+                </small>
+            `;
         }
+        
+        // Проверяем статус мониторинга
+        checkMonitorStatus();
+        
     } catch (error) {
         console.error('Error checking sync status:', error);
         document.getElementById('syncStatusText').textContent = 'Ошибка проверки статуса';
     }
 }
 
+// Проверка статуса мониторинга
+async function checkMonitorStatus() {
+    try {
+        const response = await fetch('/api/monitor/status');
+        const data = await response.json();
+        
+        const monitoringDetails = document.getElementById('monitoringStatusDetails');
+        const toggleBtn = document.getElementById('monitorToggleBtn');
+        
+        if (data.is_running) {
+            monitoringDetails.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="badge bg-success">Активен</span>
+                    <small>Отслеживание изменений</small>
+                </div>
+                <small class="text-muted d-block mt-1">
+                    Отслеживается чатов: ${data.monitored_chats_count || 0}
+                </small>
+                ${data.recent_changes ? `
+                    <small class="text-muted d-block">
+                        Последние изменения: ${data.recent_changes} мин. назад
+                    </small>
+                ` : ''}
+            `;
+            
+            toggleBtn.innerHTML = '<i class="bi bi-stop-fill"></i> Остановить';
+            toggleBtn.classList.remove('btn-outline-warning');
+            toggleBtn.classList.add('btn-danger');
+        } else {
+            monitoringDetails.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="badge bg-secondary">Неактивен</span>
+                    <small>Мониторинг остановлен</small>
+                </div>
+                <small class="text-muted d-block mt-1">
+                    Запустите для отслеживания изменений
+                </small>
+            `;
+            
+            toggleBtn.innerHTML = '<i class="bi bi-play-fill"></i> Запустить';
+            toggleBtn.classList.remove('btn-danger');
+            toggleBtn.classList.add('btn-outline-warning');
+        }
+    } catch (error) {
+        console.error('Error checking monitor status:', error);
+    }
+}
+
+// Переключение мониторинга
+async function toggleMonitoring() {
+    const btn = document.getElementById('monitorToggleBtn');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Загрузка...';
+    
+    try {
+        // Проверяем текущий статус
+        const statusResponse = await fetch('/api/monitor/status');
+        const statusData = await statusResponse.json();
+        
+        let response;
+        if (statusData.is_running) {
+            // Останавливаем
+            response = await fetch('/api/monitor/stop', { method: 'POST' });
+        } else {
+            // Запускаем
+            response = await fetch('/api/monitor/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: 'all' })
+            });
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Обновляем статус
+            checkMonitorStatus();
+            
+            // Показываем уведомление
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+            alert.style.zIndex = '9999';
+            alert.innerHTML = `
+                <i class="bi bi-check-circle me-2"></i>
+                ${statusData.is_running ? 'Мониторинг остановлен' : 'Мониторинг запущен'}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alert);
+            setTimeout(() => alert.remove(), 3000);
+        } else {
+            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    } catch (error) {
+        alert('Ошибка при переключении мониторинга: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+}
+
 // Проверяем статус при загрузке и каждые 5 секунд
 checkSyncStatus();
 setInterval(checkSyncStatus, 5000);
+
+// Загрузка списка чатов
+let allChats = [];
+let currentView = 'list'; // list или grid
+
+async function loadChats() {
+    try {
+        const response = await fetch('/api/chat-list');
+        const data = await response.json();
+        
+        if (data.success) {
+            allChats = data.chats;
+            updateChatCount(allChats.length);
+            displayChats(allChats);
+        } else {
+            console.error('Error loading chats:', data.error);
+        }
+    } catch (error) {
+        console.error('Error loading chats:', error);
+    }
+}
+
+function updateChatCount(count) {
+    document.querySelector('#chatCountInfo .badge').textContent = count;
+}
+
+function displayChats(chats) {
+    const container = document.getElementById('chatListContainer');
+    
+    if (chats.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-4">
+                <i class="bi bi-inbox fs-1 text-muted"></i>
+                <p class="text-muted">Нет чатов для отображения</p>
+            </div>
+        `;
+        return;
+    }
+    
+    if (currentView === 'list') {
+        displayChatsList(chats);
+    } else {
+        displayChatsGrid(chats);
+    }
+}
+
+function displayChatsList(chats) {
+    const container = document.getElementById('chatListContainer');
+    let html = '<div class="list-group">';
+    
+    chats.forEach((chat, index) => {
+        const typeIcon = chat.type === 'User' ? 'bi-person-circle' : 
+                        chat.type === 'Chat' ? 'bi-people-fill' : 'bi-broadcast';
+        const typeColor = chat.type === 'User' ? 'success' : 
+                         chat.type === 'Chat' ? 'info' : 'warning';
+        
+        html += `
+            <div class="list-group-item list-group-item-action p-3 chat-item" 
+                 data-chat-id="${chat.id}"
+                 data-chat-name="${chat.name.toLowerCase()}"
+                 data-chat-type="${chat.type}"
+                 data-messages="${chat.message_count}"
+                 data-changes="${chat.total_changes || 0}">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi ${typeIcon} text-${typeColor} fs-4 me-3"></i>
+                            <div>
+                                <h6 class="mb-0">${chat.name}</h6>
+                                <small class="text-muted">ID: ${chat.id}</small>
+                            </div>
+                        </div>
+                        <div class="row text-center small">
+                            <div class="col">
+                                <div class="text-primary">${formatNumber(chat.message_count)}</div>
+                                <div class="text-muted">сообщений</div>
+                            </div>
+                            <div class="col">
+                                <div class="text-info">${chat.unique_users || 0}</div>
+                                <div class="text-muted">участников</div>
+                            </div>
+                            <div class="col">
+                                <div class="text-warning">${chat.total_changes || 0}</div>
+                                <div class="text-muted">изменений</div>
+                            </div>
+                            <div class="col">
+                                <div class="text-success">${chat.active_days || 0}</div>
+                                <div class="text-muted">дней</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ms-3">
+                        <a href="/chat/${chat.id}" class="btn btn-primary btn-sm">
+                            <i class="bi bi-bar-chart-line"></i> Аналитика
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function displayChatsGrid(chats) {
+    const container = document.getElementById('chatListContainer');
+    let html = '<div class="row">';
+    
+    chats.forEach((chat, index) => {
+        const typeIcon = chat.type === 'User' ? 'bi-person-circle' : 
+                        chat.type === 'Chat' ? 'bi-people-fill' : 'bi-broadcast';
+        const typeColor = chat.type === 'User' ? 'success' : 
+                         chat.type === 'Chat' ? 'info' : 'warning';
+        
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3 chat-item"
+                 data-chat-id="${chat.id}"
+                 data-chat-name="${chat.name.toLowerCase()}"
+                 data-chat-type="${chat.type}"
+                 data-messages="${chat.message_count}"
+                 data-changes="${chat.total_changes || 0}">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi ${typeIcon} text-${typeColor} fs-3 me-2"></i>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-0">${chat.name}</h6>
+                                <small class="text-muted">ID: ${chat.id}</small>
+                            </div>
+                        </div>
+                        <div class="row text-center small mb-3">
+                            <div class="col-6">
+                                <div class="text-primary">${formatNumber(chat.message_count)}</div>
+                                <div class="text-muted">сообщений</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-info">${chat.unique_users || 0}</div>
+                                <div class="text-muted">участников</div>
+                            </div>
+                        </div>
+                        <div class="d-grid">
+                            <a href="/chat/${chat.id}" class="btn btn-primary btn-sm">
+                                <i class="bi bi-bar-chart-line"></i> Открыть аналитику
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function formatNumber(num) {
+    return new Intl.NumberFormat('ru-RU').format(num);
+}
+
+function toggleChatView() {
+    currentView = currentView === 'list' ? 'grid' : 'list';
+    const icon = document.getElementById('viewToggleIcon');
+    icon.className = currentView === 'list' ? 'bi bi-grid-3x3-gap' : 'bi bi-list-ul';
+    displayChats(getFilteredChats());
+}
+
+function filterChats() {
+    const filtered = getFilteredChats();
+    updateChatCount(filtered.length);
+    displayChats(filtered);
+}
+
+function getFilteredChats() {
+    const searchTerm = document.getElementById('chatSearchInput').value.toLowerCase();
+    const typeFilter = document.getElementById('chatTypeFilter').value;
+    
+    return allChats.filter(chat => {
+        const nameMatch = !searchTerm || chat.name.toLowerCase().includes(searchTerm);
+        const typeMatch = !typeFilter || chat.type === typeFilter;
+        return nameMatch && typeMatch;
+    });
+}
+
+function sortChats() {
+    const sortBy = document.getElementById('chatSortBy').value;
+    const filtered = getFilteredChats();
+    
+    filtered.sort((a, b) => {
+        switch(sortBy) {
+            case 'messages':
+                return b.message_count - a.message_count;
+            case 'recent':
+                return new Date(b.last_message || 0) - new Date(a.last_message || 0);
+            case 'name':
+                return a.name.localeCompare(b.name);
+            case 'changes':
+                return (b.total_changes || 0) - (a.total_changes || 0);
+            default:
+                return 0;
+        }
+    });
+    
+    displayChats(filtered);
+}
+
+function resetFilters() {
+    document.getElementById('chatSearchInput').value = '';
+    document.getElementById('chatTypeFilter').value = '';
+    document.getElementById('chatSortBy').value = 'messages';
+    filterChats();
+}
+
+// Загружаем чаты при загрузке страницы
+loadChats();
 
 // Функция для быстрого запуска парсинга
 async function startQuickParsing(type) {
@@ -624,6 +1167,128 @@ python status_monitor.py
     `;
 
     alert(message);
+}
+
+// Main page chat search functionality
+let mainSearchTimeout;
+let currentFilter = 'all';
+const mainSearchInput = document.getElementById('mainChatSearch');
+const mainSearchResults = document.getElementById('mainSearchResults');
+const resultsContainer = mainSearchResults.querySelector('.list-group');
+
+// Filter buttons management
+function filterMainChats(type) {
+    currentFilter = type;
+    
+    // Update active button
+    document.querySelectorAll('.btn-group button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Trigger search with current query
+    const query = mainSearchInput.value.trim();
+    if (query || type !== 'all') {
+        performMainSearch(query);
+    }
+}
+
+// Search input handler
+if (mainSearchInput) {
+    mainSearchInput.addEventListener('input', function() {
+        clearTimeout(mainSearchTimeout);
+        const query = this.value.trim();
+        
+        if (query.length === 0 && currentFilter === 'all') {
+            mainSearchResults.style.display = 'none';
+            return;
+        }
+        
+        mainSearchTimeout = setTimeout(() => performMainSearch(query), 300);
+    });
+    
+    // Search button click
+    document.getElementById('mainSearchBtn').addEventListener('click', function() {
+        const query = mainSearchInput.value.trim();
+        performMainSearch(query);
+    });
+}
+
+// Perform search
+async function performMainSearch(query) {
+    try {
+        // Show loading
+        resultsContainer.innerHTML = '<div class="list-group-item text-center"><span class="spinner-border spinner-border-sm"></span> Поиск...</div>';
+        mainSearchResults.style.display = 'block';
+        
+        // Fetch all chats
+        const response = await fetch('/api/chat-list');
+        const data = await response.json();
+        
+        if (data.success) {
+            let chats = data.chats;
+            
+            // Filter by query
+            if (query) {
+                chats = chats.filter(chat => 
+                    chat.name.toLowerCase().includes(query.toLowerCase())
+                );
+            }
+            
+            // Filter by type
+            if (currentFilter !== 'all') {
+                chats = chats.filter(chat => chat.type === currentFilter);
+            }
+            
+            // Sort by message count
+            chats.sort((a, b) => b.message_count - a.message_count);
+            
+            // Display results
+            displayMainSearchResults(chats);
+        }
+    } catch (error) {
+        resultsContainer.innerHTML = '<div class="list-group-item text-danger">Ошибка поиска</div>';
+    }
+}
+
+// Display search results
+function displayMainSearchResults(chats) {
+    if (chats.length === 0) {
+        resultsContainer.innerHTML = '<div class="list-group-item">Ничего не найдено</div>';
+        return;
+    }
+    
+    resultsContainer.innerHTML = chats.slice(0, 20).map(chat => {
+        const typeIcon = chat.type === 'User' ? 'bi-person' : 
+                        chat.type === 'Chat' ? 'bi-people' : 'bi-broadcast';
+        const typeColor = chat.type === 'User' ? 'success' : 
+                         chat.type === 'Chat' ? 'info' : 'warning';
+        
+        return `
+            <a href="/chat/${chat.id}" class="list-group-item list-group-item-action">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center">
+                            <i class="bi ${typeIcon} text-${typeColor} me-2"></i>
+                            <h6 class="mb-1">${chat.name}</h6>
+                        </div>
+                        <div class="d-flex text-muted small">
+                            <span class="me-3"><i class="bi bi-envelope"></i> ${chat.message_count} сообщ.</span>
+                            <span class="me-3"><i class="bi bi-people"></i> ${chat.unique_users} участн.</span>
+                            <span><i class="bi bi-pencil"></i> ${chat.changes_count} изм.</span>
+                        </div>
+                    </div>
+                    <div>
+                        <small class="text-muted">${chat.type}</small>
+                    </div>
+                </div>
+            </a>
+        `;
+    }).join('');
+    
+    if (chats.length > 20) {
+        resultsContainer.innerHTML += '<div class="list-group-item text-center text-muted">Показаны первые 20 результатов</div>';
+    }
 }
 </script>
 

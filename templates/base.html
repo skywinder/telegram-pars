@@ -16,11 +16,27 @@
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
+        <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('index') }}">
                 <i class="bi bi-telegram"></i> Telegram Parser
             </a>
+
+            <!-- Stats indicators for desktop -->
+            <div class="d-none d-lg-flex align-items-center mx-3" id="navbar-stats">
+                <span class="badge bg-light text-dark me-2" title="Всего чатов">
+                    <i class="bi bi-chat-dots"></i> <span id="nav-total-chats">-</span>
+                </span>
+                <span class="badge bg-light text-dark me-2" title="Всего сообщений">
+                    <i class="bi bi-envelope"></i> <span id="nav-total-messages">-</span>
+                </span>
+                <span class="badge bg-light text-dark me-2" title="Изменений">
+                    <i class="bi bi-pencil"></i> <span id="nav-total-changes">-</span>
+                </span>
+                <span class="badge" id="nav-monitor-status" title="Статус мониторинга">
+                    <i class="bi bi-broadcast"></i> <span id="nav-monitor-text">-</span>
+                </span>
+            </div>
 
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -30,12 +46,7 @@
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('index') }}">
-                            <i class="bi bi-house"></i> Главная
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('control_panel') }}">
-                            <i class="bi bi-sliders"></i> Панель управления
+                            <i class="bi bi-speedometer2"></i> Дашборд
                         </a>
                     </li>
                     <li class="nav-item">
@@ -44,49 +55,74 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('analytics_page') }}">
-                            <i class="bi bi-graph-up"></i> Аналитика
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('status_page') }}">
-                            <i class="bi bi-activity"></i> Статус
-                        </a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('parsing_page') }}">
-                            <i class="bi bi-play-circle"></i> Парсинг
+                            <i class="bi bi-arrow-clockwise"></i> Синхронизация
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('realtime_monitor_page') }}">
+                            <i class="bi bi-broadcast"></i> Мониторинг
                         </a>
                     </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-tools"></i> Инструменты
+                            <i class="bi bi-graph-up"></i> Аналитика
                         </a>
                         <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('analytics_page') }}">
+                                <i class="bi bi-bar-chart"></i> Общая статистика
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('message_changes') }}">
+                                <i class="bi bi-pencil-square"></i> Измененные сообщения
+                            </a></li>
                             <li><a class="dropdown-item" href="{{ url_for('emoji_stats') }}">
                                 <i class="bi bi-emoji-smile"></i> Эмодзи статистика
                             </a></li>
                             <li><a class="dropdown-item" href="{{ url_for('conversation_starters') }}">
                                 <i class="bi bi-chat-left-text"></i> Инициаторы диалогов
                             </a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('message_changes') }}">
-                                <i class="bi bi-pencil-square"></i> Измененные сообщения
-                            </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('realtime_monitor_page') }}">
-                                <i class="bi bi-broadcast"></i> Мониторинг Real-time
-                            </a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-tools"></i> Инструменты
+                        </a>
+                        <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('search_page') }}">
-                                <i class="bi bi-search"></i> Поиск
+                                <i class="bi bi-search"></i> Поиск сообщений
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('export_page') }}">
+                                <i class="bi bi-download"></i> Экспорт данных
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('control_panel') }}">
+                                <i class="bi bi-sliders"></i> Панель управления
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('status_page') }}">
+                                <i class="bi bi-activity"></i> Системный статус
                             </a></li>
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('export_page') }}">
-                            <i class="bi bi-download"></i> Экспорт
+                        <a class="nav-link" href="{{ url_for('help_page') }}">
+                            <i class="bi bi-question-circle"></i> Помощь
                         </a>
                     </li>
                 </ul>
+
+                <!-- Quick search in navbar -->
+                <form class="d-flex me-3" id="navbar-search-form" onsubmit="return false;">
+                    <div class="input-group">
+                        <input class="form-control form-control-sm" type="search" placeholder="Быстрый поиск чата..." id="navbar-chat-search" autocomplete="off">
+                        <button class="btn btn-outline-light btn-sm" type="button" id="navbar-search-btn">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                    <!-- Search results dropdown -->
+                    <div class="position-absolute top-100 start-0 w-100 mt-1" style="z-index: 1050;">
+                        <div id="navbar-search-results" class="list-group shadow" style="display: none; max-height: 300px; overflow-y: auto;"></div>
+                    </div>
+                </form>
 
                 <span class="navbar-text">
                     <i class="bi bi-clock"></i> <span id="current-time"></span>
@@ -94,6 +130,9 @@
             </div>
         </div>
     </nav>
+
+    <!-- Spacer for fixed navbar -->
+    <div style="height: 60px;"></div>
 
     <!-- Flash Messages -->
     <div class="container mt-3">
@@ -138,7 +177,7 @@
     <!-- Custom JS -->
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 
-    <!-- Time Update Script -->
+    <!-- Time Update Script and Navbar Functionality -->
     <script>
         function updateTime() {
             const now = new Date();
@@ -152,6 +191,104 @@
         // Update time immediately and then every minute
         updateTime();
         setInterval(updateTime, 60000);
+
+        // Load navbar stats
+        async function loadNavbarStats() {
+            try {
+                const response = await fetch('/api/stats/summary');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('nav-total-chats').textContent = data.total_chats || '0';
+                    document.getElementById('nav-total-messages').textContent = data.total_messages || '0';
+                    document.getElementById('nav-total-changes').textContent = data.total_changes || '0';
+                }
+            } catch (error) {
+                console.error('Error loading navbar stats:', error);
+            }
+        }
+
+        // Check monitoring status
+        async function checkMonitoringStatus() {
+            try {
+                const response = await fetch('/api/monitor/status');
+                const data = await response.json();
+                
+                const statusBadge = document.getElementById('nav-monitor-status');
+                const statusText = document.getElementById('nav-monitor-text');
+                
+                if (data.is_active) {
+                    statusBadge.className = 'badge bg-success';
+                    statusText.textContent = 'Активен';
+                } else {
+                    statusBadge.className = 'badge bg-secondary';
+                    statusText.textContent = 'Неактивен';
+                }
+            } catch (error) {
+                console.error('Error checking monitoring status:', error);
+            }
+        }
+
+        // Navbar chat search functionality
+        let searchTimeout;
+        const searchInput = document.getElementById('navbar-chat-search');
+        const searchResults = document.getElementById('navbar-search-results');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                const query = this.value.trim();
+                
+                if (query.length < 2) {
+                    searchResults.style.display = 'none';
+                    return;
+                }
+                
+                searchTimeout = setTimeout(() => searchChats(query), 300);
+            });
+
+            // Hide results when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('#navbar-search-form')) {
+                    searchResults.style.display = 'none';
+                }
+            });
+        }
+
+        async function searchChats(query) {
+            try {
+                const response = await fetch('/api/chats/search?q=' + encodeURIComponent(query));
+                const data = await response.json();
+                
+                if (data.success && data.results.length > 0) {
+                    searchResults.innerHTML = data.results.map(chat => `
+                        <a href="/chat/${chat.id}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">${chat.name}</h6>
+                                <small>${chat.type}</small>
+                            </div>
+                            <small class="text-muted">${chat.message_count} сообщений</small>
+                        </a>
+                    `).join('');
+                    searchResults.style.display = 'block';
+                } else {
+                    searchResults.innerHTML = '<div class="list-group-item">Ничего не найдено</div>';
+                    searchResults.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error searching chats:', error);
+            }
+        }
+
+        // Load stats on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadNavbarStats();
+            checkMonitoringStatus();
+            
+            // Update stats periodically
+            setInterval(loadNavbarStats, 30000); // Every 30 seconds
+            setInterval(checkMonitoringStatus, 10000); // Every 10 seconds
+        });
     </script>
 
     {% block scripts %}{% endblock %}

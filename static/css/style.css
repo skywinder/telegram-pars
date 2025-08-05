@@ -1,24 +1,38 @@
-/* Telegram Parser - Custom Styles */
+/* Telegram Parser - Modern UI Styles */
 
 :root {
     --telegram-blue: #0088cc;
     --telegram-dark-blue: #006699;
     --telegram-light-blue: #e3f2fd;
+    --primary-gradient: linear-gradient(135deg, #0088cc 0%, #006699 100%);
     --border-radius: 0.5rem;
+    --border-radius-lg: 1rem;
     --transition: all 0.3s ease;
+    --shadow-sm: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+    --shadow-md: 0 0.5rem 1rem rgba(0,0,0,0.15);
+    --shadow-lg: 0 1rem 3rem rgba(0,0,0,0.175);
 }
 
 /* Body and Layout */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f8f9fa;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: #f5f7fa;
     line-height: 1.6;
+    color: #333;
+    padding-top: 60px; /* For fixed navbar */
 }
 
-/* Navigation */
+/* Navigation Enhancements */
+.navbar {
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    backdrop-filter: blur(10px);
+    background: var(--primary-gradient) !important;
+}
+
 .navbar-brand {
-    font-weight: 600;
-    font-size: 1.5rem;
+    font-weight: 700;
+    font-size: 1.4rem;
+    letter-spacing: -0.5px;
 }
 
 .navbar-nav .nav-link {
@@ -26,31 +40,116 @@ body {
     padding: 0.5rem 1rem;
     border-radius: var(--border-radius);
     transition: var(--transition);
+    position: relative;
 }
 
 .navbar-nav .nav-link:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
 }
 
-/* Cards */
+.navbar-nav .nav-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 3px;
+    background-color: #fff;
+    border-radius: 3px;
+}
+
+/* Navbar Stats */
+#navbar-stats .badge {
+    font-size: 0.75rem;
+    padding: 0.4em 0.8em;
+    border-radius: 2rem;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Navbar Search */
+#navbar-search-form {
+    position: relative;
+}
+
+#navbar-search-results {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid #e0e0e0;
+}
+
+/* Card Enhancements */
 .card {
     border: none;
-    border-radius: var(--border-radius);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-sm);
     transition: var(--transition);
     background-color: #fff;
+    overflow: hidden;
+    position: relative;
 }
 
 .card:hover {
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-3px);
 }
 
 .card-header {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #e9ecef;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 2px solid #e9ecef;
     font-weight: 600;
     color: #333;
+    padding: 1rem 1.25rem;
+}
+
+/* Animated Card Backgrounds */
+.card.bg-primary,
+.card.bg-success,
+.card.bg-warning,
+.card.bg-info,
+.card.bg-danger {
+    background: var(--primary-gradient) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.card.bg-primary::before,
+.card.bg-success::before,
+.card.bg-warning::before,
+.card.bg-info::before,
+.card.bg-danger::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.card.bg-success {
+    background: linear-gradient(135deg, #28a745 0%, #20863d 100%) !important;
+}
+
+.card.bg-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%) !important;
+}
+
+.card.bg-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%) !important;
+}
+
+.card.bg-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #bd2130 100%) !important;
 }
 
 /* Ensure text is visible on cards */
@@ -113,25 +212,74 @@ body {
     background-color: var(--telegram-light-blue);
 }
 
-/* Buttons */
+/* Modern Button Styling */
 .btn {
     border-radius: var(--border-radius);
-    font-weight: 500;
+    font-weight: 600;
     transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    border: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.875rem;
 }
 
 .btn:hover {
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+.btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
 .btn-primary {
-    background-color: var(--telegram-blue);
-    border-color: var(--telegram-blue);
+    background: var(--primary-gradient);
+    color: white;
 }
 
 .btn-primary:hover {
-    background-color: var(--telegram-dark-blue);
-    border-color: var(--telegram-dark-blue);
+    background: linear-gradient(135deg, #006699 0%, #004d73 100%);
+}
+
+.btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255,255,255,0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.btn-primary:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* Button Group Styling */
+.btn-group .btn {
+    margin: 0 2px;
+    border-radius: 50px;
+    padding: 0.5rem 1.5rem;
+}
+
+.btn-group .btn.active {
+    background: var(--primary-gradient);
+    color: white;
+    box-shadow: 0 4px 10px rgba(0, 136, 204, 0.3);
+}
+
+/* Small buttons */
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;
+    text-transform: none;
 }
 
 /* Badges */
@@ -160,38 +308,81 @@ body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Search */
+/* Modern Search Styling */
 .search-container {
     position: relative;
 }
 
-.search-results {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: white;
-    border: 1px solid #dee2e6;
-    border-radius: var(--border-radius);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.search-result-item {
-    padding: 1rem;
-    border-bottom: 1px solid #e9ecef;
-    cursor: pointer;
+#mainChatSearch {
+    border: 2px solid transparent;
+    font-size: 1.1rem;
+    padding: 0.75rem 1rem;
     transition: var(--transition);
 }
 
-.search-result-item:hover {
-    background-color: var(--telegram-light-blue);
+#mainChatSearch:focus {
+    border-color: var(--telegram-blue);
+    box-shadow: 0 0 0 0.2rem rgba(0, 136, 204, 0.25);
 }
 
-.search-result-item:last-child {
+.input-group-text {
+    background: var(--telegram-blue);
+    border: none;
+    color: white;
+}
+
+#mainSearchBtn {
+    background: var(--telegram-blue);
+    border: none;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+}
+
+#mainSearchBtn:hover {
+    background: var(--telegram-dark-blue);
+    transform: translateY(-1px);
+}
+
+#mainSearchResults .list-group {
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-lg);
+}
+
+#mainSearchResults .list-group-item {
+    border: none;
+    border-bottom: 1px solid #f0f0f0;
+    transition: var(--transition);
+    padding: 1rem;
+}
+
+#mainSearchResults .list-group-item:hover {
+    background: linear-gradient(to right, var(--telegram-light-blue) 0%, transparent 100%);
+    transform: translateX(5px);
+    border-left: 3px solid var(--telegram-blue);
+}
+
+#mainSearchResults .list-group-item:first-child {
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+#mainSearchResults .list-group-item:last-child {
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
     border-bottom: none;
+}
+
+/* Search Results Icons */
+.search-result-item .bi {
+    font-size: 1.2rem;
+    margin-right: 0.5rem;
+}
+
+/* Search highlight */
+mark {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    color: #212529;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-weight: 600;
 }
 
 /* Charts */
@@ -291,15 +482,97 @@ footer {
     background: var(--telegram-dark-blue);
 }
 
-/* Animation for cards */
+/* Modern Animations */
 .fade-in {
-    animation: fadeIn 0.5s ease-in;
+    animation: fadeIn 0.5s ease-out;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { 
+        opacity: 0; 
+        transform: translateY(20px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
 }
+
+/* Slide animations */
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Pulse animation for active status */
+.status-active {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background-color: #28a745;
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+    }
+}
+
+/* Loading animation */
+.spinner-border {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-width: 0.2em;
+}
+
+/* Hover effects for interactive elements */
+.interactive-hover {
+    transition: var(--transition);
+}
+
+.interactive-hover:hover {
+    transform: scale(1.02);
+    box-shadow: var(--shadow-md);
+}
+
+/* Recent chat cards animation */
+.recent-chat-card {
+    animation: slideInLeft 0.5s ease-out;
+    animation-fill-mode: both;
+}
+
+.recent-chat-card:nth-child(1) { animation-delay: 0.1s; }
+.recent-chat-card:nth-child(2) { animation-delay: 0.2s; }
+.recent-chat-card:nth-child(3) { animation-delay: 0.3s; }
+.recent-chat-card:nth-child(4) { animation-delay: 0.4s; }
+.recent-chat-card:nth-child(5) { animation-delay: 0.5s; }
+.recent-chat-card:nth-child(6) { animation-delay: 0.6s; }
 
 /* Message changes page specific styles */
 .message-changes-stats .card {
