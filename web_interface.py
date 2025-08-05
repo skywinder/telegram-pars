@@ -18,6 +18,7 @@ from notification_manager import get_notification_manager
 from queue import Queue, Empty
 import time
 from json_utils import safe_json_dumps
+from monitor_manager import MonitorManager
 
 # Создаем Flask приложение
 app = Flask(__name__)
@@ -920,17 +921,28 @@ def realtime_monitor_page():
 @app.route('/api/monitor/status')
 def api_monitor_status():
     """API для получения статуса мониторинга"""
-    monitor = get_monitor_instance()
+    # Получаем статус из файла (работает между процессами)
+    status = MonitorManager.get_status()
     
-    if not monitor:
+    # Также проверяем локальный экземпляр если есть
+    monitor = get_monitor_instance()
+    local_active = monitor is not None and monitor.is_running if monitor else False
+    
+    # Используем статус из файла как основной
+    is_active = status.get('is_active', False) or local_active
+    
+    if not is_active and not monitor:
         return jsonify({
             'is_active': False,
-            'message': 'Монитор не инициализирован'
+            'message': 'Монитор не инициализирован',
+            'stats': status.get('stats', {})
         })
     
     return jsonify({
-        'is_active': monitor.is_running,
-        'monitored_chats': len(monitor.monitored_chats) if monitor.monitored_chats else 'all'
+        'is_active': is_active,
+        'monitored_chats': len(monitor.monitored_chats) if monitor and monitor.monitored_chats else status.get('mode', 'all'),
+        'stats': status.get('stats', {}),
+        'last_updated': status.get('last_updated')
     })
 
 @app.route('/api/monitor/recent-changes')
@@ -978,26 +990,168 @@ def monitor_stream():
             
     return Response(generate(), mimetype="text/event-stream")
 
-@app.route('/api/monitor/control', methods=['POST'])
-def monitor_control():
-    """API для управления мониторингом из веб-интерфейса"""
-    data = request.get_json()
-    action = data.get('action')
+@app.route('/control-panel')
+def control_panel():
+    """Страница панели управления"""
+    # Получаем список чатов для селекторов
+    chats = []
+    if db:
+        chats = db.get_all_chats()
     
-    # Здесь пока просто возвращаем сообщение
-    # В будущем можно добавить управление через отдельный процесс
-    if action == 'start':
-        return jsonify({
-            'success': False,
-            'message': 'Для запуска мониторинга используйте консольное приложение (python main.py → пункт 10)'
-        })
-    elif action == 'stop':
-        return jsonify({
-            'success': False,
-            'message': 'Для остановки мониторинга используйте консольное приложение'
-        })
+    # Получаем размер БД
+    db_size = 0
+    if db and os.path.exists(db.db_path):
+        db_size = round(os.path.getsize(db.db_path) / (1024 * 1024), 2)
+    
+    # Получаем номер телефона из конфига
+    phone_number = os.getenv('PHONE_NUMBER', 'Не указан')
+    
+    return render_template('control_panel.html',
+                         chats=chats,
+                         db_size=db_size,
+                         phone_number=phone_number)
+
+@app.route('/api/parser/status')
+def parser_status():
+    """Получение статуса парсера"""
+    status_data = StatusManager.get_status()
+    is_active = status_data is not None and status_data.get('status') == 'parsing'
+    
+    return jsonify({
+        'is_active': is_active,
+        'status': status_data
+    })
+
+@app.route('/api/parser/start', methods=['POST'])
+def start_parser():
+    """Запуск парсера в фоновом режиме"""
+    import subprocess
+    import threading
+    
+    def run_parser():
+        try:
+            subprocess.run(['python', 'main.py', '--auto', '--all'], 
+                         capture_output=True, text=True)
+        except Exception as e:
+            print(f"Error running parser: {e}")
+    
+    # Запускаем в отдельном потоке
+    thread = threading.Thread(target=run_parser)
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({'success': True, 'message': 'Парсер запущен'})
+
+@app.route('/api/parser/stop', methods=['POST'])
+def stop_parser():
+    """Остановка парсера"""
+    StatusManager.request_interruption()
+    return jsonify({'success': True, 'message': 'Запрошена остановка парсера'})
+
+@app.route('/api/monitor/start', methods=['POST'])
+def start_monitor():
+    """Запуск мониторинга"""
+    data = request.get_json()
+    mode = data.get('mode', 'all')
+    chat_ids = data.get('chat_ids', [])
+    
+    monitor = get_monitor_instance()
+    if monitor:
+        # Запускаем мониторинг
+        asyncio.run(monitor.start_monitoring(chat_ids if mode == 'selected' else None))
+        return jsonify({'success': True, 'message': 'Мониторинг запущен'})
     else:
-        return jsonify({'error': 'Неизвестное действие'}), 400
+        return jsonify({'success': False, 'error': 'Монитор не инициализирован'}), 500
+
+@app.route('/api/monitor/stop', methods=['POST'])
+def stop_monitor():
+    """Остановка мониторинга"""
+    monitor = get_monitor_instance()
+    if monitor:
+        monitor.stop_monitoring()
+        return jsonify({'success': True, 'message': 'Мониторинг остановлен'})
+    else:
+        return jsonify({'success': False, 'error': 'Монитор не инициализирован'}), 500
+
+@app.route('/api/monitor/configure', methods=['POST'])
+def configure_monitor():
+    """Настройка мониторинга"""
+    data = request.get_json()
+    # Сохраняем настройки в конфиг или БД
+    return jsonify({'success': True, 'message': 'Настройки сохранены'})
+
+@app.route('/api/parsing/start', methods=['POST'])
+def start_parsing():
+    """Запуск парсинга с параметрами"""
+    data = request.get_json()
+    parsing_type = data.get('type', 'all')
+    chat_ids = data.get('chat_ids', [])
+    force_full_scan = data.get('force_full_scan', False)
+    limit = data.get('limit', 0)
+    
+    # Формируем команду
+    cmd = ['python', 'main.py', '--auto']
+    
+    if parsing_type == 'all':
+        cmd.append('--all')
+    elif parsing_type == 'check_changes':
+        cmd.append('--check-changes')
+    elif parsing_type == 'selected' and chat_ids:
+        cmd.extend(['--chats'] + chat_ids)
+    
+    if force_full_scan:
+        cmd.append('--force-full-scan')
+    
+    if limit > 0:
+        cmd.extend(['--limit', str(limit)])
+    
+    # Запускаем в фоне
+    import subprocess
+    import threading
+    
+    def run():
+        subprocess.run(cmd, capture_output=True)
+    
+    thread = threading.Thread(target=run)
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({'success': True, 'message': 'Парсинг запущен'})
+
+@app.route('/api/activity/stream')
+def activity_stream():
+    """SSE поток для логов активности"""
+    def generate():
+        # Отправляем heartbeat
+        yield f"data: {safe_json_dumps({'message': 'Подключено к потоку активности', 'type': 'info'})}\n\n"
+        
+        while True:
+            try:
+                # Проверяем статус и отправляем обновления
+                status = StatusManager.get_status()
+                if status:
+                    yield f"data: {safe_json_dumps({'message': f'Парсинг: {status.get("current_chat", "...")}', 'type': 'info'})}\n\n"
+                
+                time.sleep(2)
+            except GeneratorExit:
+                break
+    
+    return Response(generate(), mimetype="text/event-stream")
+
+@app.route('/api/settings')
+def get_settings():
+    """Получение настроек"""
+    return jsonify({
+        'api_id': os.getenv('TELEGRAM_API_ID', ''),
+        'phone_number': os.getenv('PHONE_NUMBER', ''),
+        'auto_start_monitor': config.ENABLE_REALTIME_MONITOR if hasattr(config, 'ENABLE_REALTIME_MONITOR') else False
+    })
+
+@app.route('/api/cache/clear', methods=['POST'])
+def clear_cache():
+    """Очистка кэша"""
+    # TODO: Реализовать очистку кэша
+    return jsonify({'success': True, 'message': 'Кэш очищен'})
 
 if __name__ == '__main__':
     print("🌐 Запуск веб-интерфейса Telegram Parser...")

@@ -1,0 +1,745 @@
+{% extends "base.html" %}
+
+{% block title %}Панель управления - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Заголовок -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1><i class="bi bi-sliders"></i> Панель управления</h1>
+            <p class="text-muted">Централизованное управление всеми функциями парсера</p>
+        </div>
+    </div>
+
+    <!-- Статусы сервисов -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5>Парсер</h5>
+                    <div id="parser-status" class="mb-2">
+                        <span class="badge bg-secondary fs-6">
+                            <i class="bi bi-circle"></i> Неактивен
+                        </span>
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="startParser()">
+                        <i class="bi bi-play-fill"></i> Запустить
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="stopParser()" style="display:none;">
+                        <i class="bi bi-stop-fill"></i> Остановить
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5>Мониторинг</h5>
+                    <div id="monitor-status" class="mb-2">
+                        <span class="badge bg-secondary fs-6">
+                            <i class="bi bi-circle"></i> Неактивен
+                        </span>
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="startMonitor()">
+                        <i class="bi bi-play-fill"></i> Запустить
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="stopMonitor()" style="display:none;">
+                        <i class="bi bi-stop-fill"></i> Остановить
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5>База данных</h5>
+                    <div id="db-status" class="mb-2">
+                        <span class="badge bg-success fs-6">
+                            <i class="bi bi-check-circle"></i> Подключена
+                        </span>
+                    </div>
+                    <small class="text-muted">{{ db_size }} МБ</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5>API Telegram</h5>
+                    <div id="api-status" class="mb-2">
+                        <span class="badge bg-success fs-6">
+                            <i class="bi bi-check-circle"></i> Подключен
+                        </span>
+                    </div>
+                    <small class="text-muted">{{ phone_number }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Основные функции -->
+    <div class="row">
+        <!-- Парсинг -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-download"></i> Парсинг чатов</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Тип парсинга</label>
+                        <select class="form-select" id="parsing-type">
+                            <option value="all">Все чаты</option>
+                            <option value="selected">Выбранные чаты</option>
+                            <option value="single">Один чат</option>
+                            <option value="check_changes">Проверка изменений</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3" id="chat-select-container" style="display:none;">
+                        <label class="form-label">Выберите чаты</label>
+                        <select class="form-select" id="chat-select" multiple size="5">
+                            {% for chat in chats %}
+                            <option value="{{ chat.id }}">{{ chat.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Удерживайте Ctrl для выбора нескольких</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="force-full-scan">
+                            <label class="form-check-label" for="force-full-scan">
+                                Полное сканирование (игнорировать кэш)
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Лимит сообщений (0 = все)</label>
+                        <input type="number" class="form-control" id="message-limit" value="0" min="0">
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" onclick="startParsing()">
+                            <i class="bi bi-play-circle"></i> Начать парсинг
+                        </button>
+                        <a href="/parsing" class="btn btn-outline-secondary">
+                            <i class="bi bi-eye"></i> Открыть страницу парсинга
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Мониторинг -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-broadcast"></i> Мониторинг изменений</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Режим мониторинга</label>
+                        <select class="form-select" id="monitor-mode">
+                            <option value="all">Все чаты</option>
+                            <option value="selected">Выбранные чаты</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3" id="monitor-chat-select-container" style="display:none;">
+                        <label class="form-label">Выберите чаты для мониторинга</label>
+                        <select class="form-select" id="monitor-chat-select" multiple size="5">
+                            {% for chat in chats %}
+                            <option value="{{ chat.id }}">{{ chat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="enable-notifications" checked>
+                            <label class="form-check-label" for="enable-notifications">
+                                Включить уведомления
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" onclick="configureMonitoring()">
+                            <i class="bi bi-gear"></i> Настроить мониторинг
+                        </button>
+                        <a href="/realtime-monitor" class="btn btn-outline-secondary">
+                            <i class="bi bi-eye"></i> Открыть мониторинг
+                        </a>
+                    </div>
+                    
+                    <!-- Статистика мониторинга -->
+                    <div class="mt-3 p-3 bg-light rounded" id="monitor-stats" style="display:none;">
+                        <h6>Статистика мониторинга</h6>
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <div class="fs-4 text-warning">0</div>
+                                <small>Изменено</small>
+                            </div>
+                            <div class="col-6">
+                                <div class="fs-4 text-danger">0</div>
+                                <small>Удалено</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Дополнительные функции -->
+    <div class="row">
+        <!-- Аналитика -->
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> Аналитика</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Анализ собранных данных</p>
+                    <div class="d-grid gap-2">
+                        <a href="/analytics" class="btn btn-outline-primary">
+                            <i class="bi bi-bar-chart"></i> Открыть аналитику
+                        </a>
+                        <button class="btn btn-outline-secondary" onclick="generateReport()">
+                            <i class="bi bi-file-text"></i> Создать отчет
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Экспорт -->
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-cloud-download"></i> Экспорт данных</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Экспорт в различные форматы</p>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-success" onclick="exportData('json')">
+                            <i class="bi bi-filetype-json"></i> Экспорт в JSON
+                        </button>
+                        <button class="btn btn-outline-success" onclick="exportData('csv')">
+                            <i class="bi bi-filetype-csv"></i> Экспорт в CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Настройки -->
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-gear"></i> Настройки</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Конфигурация системы</p>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-secondary" onclick="openSettings()">
+                            <i class="bi bi-sliders"></i> Открыть настройки
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="clearCache()">
+                            <i class="bi bi-trash"></i> Очистить кэш
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Логи и активность -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-terminal"></i> Последняя активность</h5>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="refreshLogs()">
+                        <i class="bi bi-arrow-clockwise"></i> Обновить
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="activity-log" class="bg-dark text-light p-3 rounded" style="height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.9em;">
+                        <div class="text-muted">Ожидание активности...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно настроек -->
+<div class="modal fade" id="settingsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Настройки системы</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Настройки будут загружены динамически -->
+                <div id="settings-content">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-primary" onclick="saveSettings()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Глобальные переменные
+let parserActive = false;
+let monitorActive = false;
+let activitySource = null;
+
+// Инициализация при загрузке
+document.addEventListener('DOMContentLoaded', function() {
+    checkStatuses();
+    connectToActivityStream();
+    
+    // Обновление статусов каждые 5 секунд
+    setInterval(checkStatuses, 5000);
+    
+    // Обработчики изменений
+    document.getElementById('parsing-type').addEventListener('change', function() {
+        const container = document.getElementById('chat-select-container');
+        container.style.display = (this.value === 'selected' || this.value === 'single') ? 'block' : 'none';
+    });
+    
+    document.getElementById('monitor-mode').addEventListener('change', function() {
+        const container = document.getElementById('monitor-chat-select-container');
+        container.style.display = this.value === 'selected' ? 'block' : 'none';
+    });
+});
+
+// Проверка статусов всех сервисов
+async function checkStatuses() {
+    try {
+        // Проверка парсера
+        const parserResponse = await fetch('/api/parser/status');
+        const parserData = await parserResponse.json();
+        updateParserStatus(parserData.is_active);
+        
+        // Проверка мониторинга
+        const monitorResponse = await fetch('/api/monitor/status');
+        const monitorData = await monitorResponse.json();
+        updateMonitorStatus(monitorData.is_active);
+        
+        // Обновление статистики мониторинга
+        if (monitorData.is_active && monitorData.stats) {
+            updateMonitorStats(monitorData.stats);
+        }
+        
+    } catch (error) {
+        console.error('Error checking statuses:', error);
+    }
+}
+
+// Обновление статуса парсера
+function updateParserStatus(isActive) {
+    parserActive = isActive;
+    const statusEl = document.getElementById('parser-status');
+    const startBtn = statusEl.parentElement.querySelector('.btn-success');
+    const stopBtn = statusEl.parentElement.querySelector('.btn-danger');
+    
+    if (isActive) {
+        statusEl.innerHTML = '<span class="badge bg-success fs-6"><i class="bi bi-circle-fill"></i> Активен</span>';
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+    } else {
+        statusEl.innerHTML = '<span class="badge bg-secondary fs-6"><i class="bi bi-circle"></i> Неактивен</span>';
+        startBtn.style.display = 'inline-block';
+        stopBtn.style.display = 'none';
+    }
+}
+
+// Обновление статуса мониторинга
+function updateMonitorStatus(isActive) {
+    monitorActive = isActive;
+    const statusEl = document.getElementById('monitor-status');
+    const startBtn = statusEl.parentElement.querySelector('.btn-success');
+    const stopBtn = statusEl.parentElement.querySelector('.btn-danger');
+    const statsEl = document.getElementById('monitor-stats');
+    
+    if (isActive) {
+        statusEl.innerHTML = '<span class="badge bg-success fs-6"><i class="bi bi-circle-fill"></i> Активен</span>';
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+        statsEl.style.display = 'block';
+    } else {
+        statusEl.innerHTML = '<span class="badge bg-secondary fs-6"><i class="bi bi-circle"></i> Неактивен</span>';
+        startBtn.style.display = 'inline-block';
+        stopBtn.style.display = 'none';
+        statsEl.style.display = 'none';
+    }
+}
+
+// Обновление статистики мониторинга
+function updateMonitorStats(stats) {
+    if (stats) {
+        document.querySelector('#monitor-stats .text-warning').textContent = stats.edited || 0;
+        document.querySelector('#monitor-stats .text-danger').textContent = stats.deleted || 0;
+    }
+}
+
+// Запуск парсера
+async function startParser() {
+    try {
+        const response = await fetch('/api/parser/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({})
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification('Парсер запущен', 'success');
+            checkStatuses();
+        } else {
+            showNotification('Ошибка запуска парсера: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Ошибка: ' + error, 'error');
+    }
+}
+
+// Остановка парсера
+async function stopParser() {
+    try {
+        const response = await fetch('/api/parser/stop', {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification('Парсер остановлен', 'success');
+            checkStatuses();
+        }
+    } catch (error) {
+        showNotification('Ошибка: ' + error, 'error');
+    }
+}
+
+// Запуск мониторинга
+async function startMonitor() {
+    try {
+        const response = await fetch('/api/monitor/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                mode: 'all',
+                chat_ids: []
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification('Мониторинг запущен', 'success');
+            checkStatuses();
+        } else {
+            showNotification('Ошибка: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Ошибка: ' + error, 'error');
+    }
+}
+
+// Остановка мониторинга
+async function stopMonitor() {
+    try {
+        const response = await fetch('/api/monitor/stop', {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification('Мониторинг остановлен', 'success');
+            checkStatuses();
+        }
+    } catch (error) {
+        showNotification('Ошибка: ' + error, 'error');
+    }
+}
+
+// Запуск парсинга с параметрами
+async function startParsing() {
+    const type = document.getElementById('parsing-type').value;
+    const forceFullScan = document.getElementById('force-full-scan').checked;
+    const limit = parseInt(document.getElementById('message-limit').value) || 0;
+    
+    let chatIds = [];
+    if (type === 'selected' || type === 'single') {
+        const select = document.getElementById('chat-select');
+        chatIds = Array.from(select.selectedOptions).map(opt => opt.value);
+        
+        if (chatIds.length === 0) {
+            showNotification('Выберите хотя бы один чат', 'warning');
+            return;
+        }
+    }
+    
+    try {
+        const response = await fetch('/api/parsing/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                type: type,
+                chat_ids: chatIds,
+                force_full_scan: forceFullScan,
+                limit: limit
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification('Парсинг запущен', 'success');
+            // Перенаправляем на страницу парсинга
+            window.location.href = '/parsing';
+        } else {
+            showNotification('Ошибка: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Ошибка: ' + error, 'error');
+    }
+}
+
+// Настройка мониторинга
+async function configureMonitoring() {
+    const mode = document.getElementById('monitor-mode').value;
+    const enableNotifications = document.getElementById('enable-notifications').checked;
+    
+    let chatIds = [];
+    if (mode === 'selected') {
+        const select = document.getElementById('monitor-chat-select');
+        chatIds = Array.from(select.selectedOptions).map(opt => opt.value);
+        
+        if (chatIds.length === 0) {
+            showNotification('Выберите хотя бы один чат', 'warning');
+            return;
+        }
+    }
+    
+    try {
+        const response = await fetch('/api/monitor/configure', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                mode: mode,
+                chat_ids: chatIds,
+                enable_notifications: enableNotifications
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification('Мониторинг настроен', 'success');
+            // Автоматически запускаем мониторинг
+            await startMonitor();
+        } else {
+            showNotification('Ошибка: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Ошибка: ' + error, 'error');
+    }
+}
+
+// Подключение к потоку активности
+function connectToActivityStream() {
+    if (activitySource) {
+        activitySource.close();
+    }
+    
+    activitySource = new EventSource('/api/activity/stream');
+    
+    activitySource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        addActivityLog(data.message, data.type);
+    };
+    
+    activitySource.onerror = function(error) {
+        console.error('Activity stream error:', error);
+        // Переподключаемся через 5 секунд
+        setTimeout(connectToActivityStream, 5000);
+    };
+}
+
+// Добавление записи в лог активности
+function addActivityLog(message, type = 'info') {
+    const logEl = document.getElementById('activity-log');
+    const timestamp = new Date().toLocaleTimeString();
+    
+    const colors = {
+        'info': 'text-light',
+        'success': 'text-success',
+        'warning': 'text-warning',
+        'error': 'text-danger'
+    };
+    
+    const entry = document.createElement('div');
+    entry.className = colors[type] || 'text-light';
+    entry.innerHTML = `[${timestamp}] ${message}`;
+    
+    // Удаляем placeholder если есть
+    const placeholder = logEl.querySelector('.text-muted');
+    if (placeholder) {
+        placeholder.remove();
+    }
+    
+    logEl.appendChild(entry);
+    
+    // Прокручиваем вниз
+    logEl.scrollTop = logEl.scrollHeight;
+    
+    // Ограничиваем количество записей
+    while (logEl.children.length > 100) {
+        logEl.removeChild(logEl.firstChild);
+    }
+}
+
+// Обновление логов
+function refreshLogs() {
+    const logEl = document.getElementById('activity-log');
+    logEl.innerHTML = '<div class="text-muted">Ожидание активности...</div>';
+    showNotification('Логи обновлены', 'info');
+}
+
+// Экспорт данных
+async function exportData(format) {
+    try {
+        const response = await fetch(`/api/export/${format}`);
+        
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `telegram_data.${format}`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            showNotification('Экспорт завершен', 'success');
+        } else {
+            showNotification('Ошибка экспорта', 'error');
+        }
+    } catch (error) {
+        showNotification('Ошибка: ' + error, 'error');
+    }
+}
+
+// Генерация отчета
+async function generateReport() {
+    showNotification('Генерация отчета...', 'info');
+    // TODO: Реализовать генерацию отчета
+}
+
+// Открытие настроек
+async function openSettings() {
+    const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+    modal.show();
+    
+    // Загружаем настройки
+    try {
+        const response = await fetch('/api/settings');
+        const settings = await response.json();
+        
+        // TODO: Отобразить настройки в модальном окне
+        document.getElementById('settings-content').innerHTML = `
+            <div class="mb-3">
+                <label class="form-label">API ID</label>
+                <input type="text" class="form-control" value="${settings.api_id || ''}" readonly>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Телефон</label>
+                <input type="text" class="form-control" value="${settings.phone_number || ''}" readonly>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Автозапуск мониторинга</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="auto-start-monitor" ${settings.auto_start_monitor ? 'checked' : ''}>
+                    <label class="form-check-label" for="auto-start-monitor">
+                        Запускать мониторинг при старте
+                    </label>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        document.getElementById('settings-content').innerHTML = '<div class="alert alert-danger">Ошибка загрузки настроек</div>';
+    }
+}
+
+// Сохранение настроек
+async function saveSettings() {
+    // TODO: Реализовать сохранение настроек
+    showNotification('Настройки сохранены', 'success');
+    bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
+}
+
+// Очистка кэша
+async function clearCache() {
+    if (!confirm('Вы уверены, что хотите очистить кэш?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/cache/clear', {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification('Кэш очищен', 'success');
+        }
+    } catch (error) {
+        showNotification('Ошибка: ' + error, 'error');
+    }
+}
+
+// Показ уведомлений
+function showNotification(message, type = 'info') {
+    // Используем Toastify если доступен
+    if (typeof Toastify !== 'undefined') {
+        const colors = {
+            'success': '#10b981',
+            'error': '#ef4444',
+            'warning': '#f59e0b',
+            'info': '#3b82f6'
+        };
+        
+        Toastify({
+            text: message,
+            duration: 3000,
+            gravity: "top",
+            position: "right",
+            backgroundColor: colors[type] || colors.info
+        }).showToast();
+    } else {
+        // Fallback на console.log
+        console.log(`[${type}] ${message}`);
+    }
+}
+</script>
+
+<!-- Toastify для уведомлений -->
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+{% endblock %}

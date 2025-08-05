@@ -4,7 +4,7 @@
 """
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from telethon import TelegramClient, events
 from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto
@@ -12,6 +12,7 @@ from database import TelegramDatabase
 import config
 from notification_manager import get_notification_manager
 from json_utils import safe_json_dumps
+from monitor_manager import MonitorManager
 
 # Настройка логирования
 logger = logging.getLogger('realtime_monitor')
@@ -87,6 +88,9 @@ class RealtimeMonitor:
                     'text': message_data.get('text', '')[:100] + ('...' if message_data.get('text', '') and len(message_data.get('text', '')) > 100 else '')
                 })
                 
+                # Обновляем статистику
+                MonitorManager.update_stats(edited=1)
+                
             except Exception as e:
                 logger.error(f"Error handling message edit: {e}")
         
@@ -126,6 +130,9 @@ class RealtimeMonitor:
                         'chat_name': (await self._get_chat_info(event.chat_id)).get('name', 'Unknown'),
                         'message_id': message_id
                     })
+                    
+                    # Обновляем статистику
+                    MonitorManager.update_stats(deleted=1)
                     
             except Exception as e:
                 logger.error(f"Error handling message deletion: {e}")
@@ -295,6 +302,9 @@ class RealtimeMonitor:
         
         logger.info(f"Started monitoring {len(self.monitored_chats) if self.monitored_chats else 'all'} chats")
         
+        # Обновляем статус в файле
+        MonitorManager.set_status(True, chat_ids)
+        
         # Клиент уже должен быть запущен в основном приложении
         # Здесь мы просто отмечаем что мониторинг активен
     
@@ -302,6 +312,9 @@ class RealtimeMonitor:
         """Останавливает мониторинг"""
         self.is_running = False
         logger.info("Stopped monitoring")
+        
+        # Обновляем статус в файле
+        MonitorManager.set_status(False)
     
     async def get_recent_changes(self, hours: int = 24, chat_id: Optional[int] = None) -> List[Dict]:
         """Получает недавние изменения из лога"""

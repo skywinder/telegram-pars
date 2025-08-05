@@ -8,6 +8,7 @@ import pandas as pd
 from datetime import datetime
 from typing import Dict, Any, List
 import config
+from json_utils import safe_json_dumps
 
 class DataExporter:
     """
@@ -33,7 +34,7 @@ class DataExporter:
         
         print(f"💾 Сохраняем данные в JSON: {filename}")
         with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write(safe_json_dumps(data))
         
         print(f"✅ JSON файл сохранен: {filepath}")
         return filepath
