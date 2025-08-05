@@ -199,12 +199,24 @@ def chat_detail(chat_id):
 
         # Анализ эмодзи
         emoji_analysis = analytics.analyze_emoji_and_expressions(chat_id)
+        
+        # Получаем статус синхронизации для этого чата
+        chat_sync_status = get_chat_sync_status(chat_id)
+        
+        # Получаем статус мониторинга
+        monitor = get_monitor_instance()
+        monitor_status = {
+            'is_active': monitor is not None and monitor.is_running if monitor else False,
+            'is_monitoring_chat': monitor and monitor.is_monitoring_chat(chat_id) if monitor else False
+        }
 
         return render_template('chat_detail.html',
                              report=report,
                              starters=starters,
                              emoji_analysis=emoji_analysis,
-                             chat_id=chat_id)
+                             chat_id=chat_id,
+                             sync_status=chat_sync_status,
+                             monitor_status=monitor_status)
     except Exception as e:
         flash(f'Ошибка загрузки чата: {e}', 'error')
         return redirect(url_for('chats'))
@@ -507,6 +519,105 @@ def message_history(chat_id, message_id):
     except Exception as e:
         flash(f'Ошибка загрузки истории: {e}', 'error')
         return redirect(url_for('message_changes'))
+
+@app.route('/chat/<chat_id>/user/<int:user_id>/messages')
+def user_messages(chat_id, user_id):
+    """Просмотр сообщений конкретного пользователя в чате"""
+    try:
+        chat_id = int(chat_id)
+    except ValueError:
+        flash('Неверный ID чата', 'error')
+        return redirect(url_for('chats'))
+    
+    if not db:
+        return redirect(url_for('index'))
+    
+    try:
+        # Получаем параметры пагинации
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        
+        with sqlite3.connect(db.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            # Получаем информацию о пользователе
+            user_info = conn.execute('''
+                SELECT id, username, first_name, last_name
+                FROM users
+                WHERE id = ?
+            ''', (user_id,)).fetchone()
+            
+            if not user_info:
+                flash('Пользователь не найден', 'error')
+                return redirect(url_for('chat_detail', chat_id=chat_id))
+            
+            # Получаем сообщения пользователя в этом чате
+            messages = conn.execute('''
+                SELECT 
+                    m.id,
+                    m.text,
+                    m.date,
+                    m.is_deleted,
+                    m.media_type,
+                    m.views,
+                    m.forwards,
+                    m.reply_to_msg_id,
+                    (SELECT COUNT(*) FROM message_history 
+                     WHERE message_id = m.id AND chat_id = m.chat_id 
+                     AND action_type = 'edited') as edit_count,
+                    (SELECT MAX(timestamp) FROM message_history 
+                     WHERE message_id = m.id AND chat_id = m.chat_id 
+                     AND action_type = 'edited') as last_edit
+                FROM messages m
+                WHERE m.chat_id = ? AND m.sender_id = ?
+                ORDER BY m.date DESC
+                LIMIT ? OFFSET ?
+            ''', (chat_id, user_id, per_page, (page - 1) * per_page)).fetchall()
+            
+            # Получаем общее количество сообщений пользователя
+            total_count = conn.execute('''
+                SELECT COUNT(*) 
+                FROM messages 
+                WHERE chat_id = ? AND sender_id = ?
+            ''', (chat_id, user_id)).fetchone()[0]
+            
+            # Получаем информацию о чате
+            chat_info = conn.execute('''
+                SELECT name, type 
+                FROM chats 
+                WHERE id = ?
+            ''', (chat_id,)).fetchone()
+            
+            # Получаем статистику пользователя в этом чате
+            user_stats = conn.execute('''
+                SELECT 
+                    COUNT(*) as message_count,
+                    AVG(LENGTH(text)) as avg_length,
+                    MIN(date) as first_message,
+                    MAX(date) as last_message,
+                    COUNT(DISTINCT DATE(date)) as active_days
+                FROM messages
+                WHERE chat_id = ? AND sender_id = ? AND is_deleted = FALSE
+            ''', (chat_id, user_id)).fetchone()
+        
+        # Вычисляем пагинацию
+        total_pages = (total_count + per_page - 1) // per_page
+        
+        return render_template('user_messages.html',
+                             messages=[dict(m) for m in messages],
+                             user_info=dict(user_info),
+                             user_stats=dict(user_stats) if user_stats else None,
+                             chat_info=dict(chat_info) if chat_info else None,
+                             chat_id=chat_id,
+                             user_id=user_id,
+                             page=page,
+                             per_page=per_page,
+                             total_pages=total_pages,
+                             total_count=total_count)
+                             
+    except Exception as e:
+        flash(f'Ошибка загрузки сообщений: {e}', 'error')
+        return redirect(url_for('chat_detail', chat_id=chat_id))
 
 @app.route('/chat/<chat_id>/messages')
 def chat_messages(chat_id):

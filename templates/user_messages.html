@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Сообщения {{ user_info.first_name or user_info.username or 'Пользователя' }} - {{ chat_info.name }} - Telegram Parser{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1>
+                    <i class="bi bi-person-circle"></i>
+                    {{ user_info.first_name }} {{ user_info.last_name or '' }}
+                    {% if user_info.username %}
+                        <small class="text-muted">@{{ user_info.username }}</small>
+                    {% endif %}
+                </h1>
+                <p class="lead text-muted mb-0">
+                    Сообщения в чате: {{ chat_info.name }}
+                </p>
+            </div>
+            <div>
+                <a href="{{ url_for('chat_detail', chat_id=chat_id) }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Назад к чату
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Статистика пользователя -->
+{% if user_stats %}
+<div class="row mb-4">
+    <div class="col-md-2 col-6 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-envelope text-primary fs-3"></i>
+                <h5 class="mt-2">{{ "{:,}".format(user_stats.message_count) }}</h5>
+                <small class="text-muted">Сообщений</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 col-6 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-text-paragraph text-success fs-3"></i>
+                <h5 class="mt-2">{{ "%.0f"|format(user_stats.avg_length or 0) }}</h5>
+                <small class="text-muted">Ср. длина</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 col-6 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-calendar-check text-info fs-3"></i>
+                <h5 class="mt-2">{{ user_stats.active_days }}</h5>
+                <small class="text-muted">Активных дней</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-calendar-range text-warning fs-3"></i>
+                <h5 class="mt-2">{{ user_stats.first_message[:10] if user_stats.first_message else 'N/A' }}</h5>
+                <small class="text-muted">Первое сообщение</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-12 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-calendar-range-fill text-danger fs-3"></i>
+                <h5 class="mt-2">{{ user_stats.last_message[:10] if user_stats.last_message else 'N/A' }}</h5>
+                <small class="text-muted">Последнее сообщение</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Фильтры и настройки -->
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="input-group">
+            <span class="input-group-text">
+                <i class="bi bi-search"></i>
+            </span>
+            <input type="text" class="form-control" id="messageFilter" placeholder="Поиск по тексту сообщений...">
+        </div>
+    </div>
+    <div class="col-md-3">
+        <select class="form-select" id="perPageSelect">
+            <option value="25" {% if per_page == 25 %}selected{% endif %}>25 сообщений</option>
+            <option value="50" {% if per_page == 50 %}selected{% endif %}>50 сообщений</option>
+            <option value="100" {% if per_page == 100 %}selected{% endif %}>100 сообщений</option>
+            <option value="200" {% if per_page == 200 %}selected{% endif %}>200 сообщений</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <div class="btn-group w-100" role="group">
+            <button class="btn btn-outline-secondary" id="showDeleted" data-show="false">
+                <i class="bi bi-trash"></i> Показать удаленные
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Сообщения -->
+<div class="row">
+    <div class="col-12">
+        {% if messages %}
+            {% for msg in messages %}
+            <div class="card mb-3 message-card {% if msg.is_deleted %}deleted-message{% endif %}" 
+                 data-text="{{ msg.text|lower if msg.text else '' }}"
+                 data-deleted="{{ 'true' if msg.is_deleted else 'false' }}">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            {% if msg.is_deleted %}
+                                <p class="text-muted mb-1">
+                                    <i class="bi bi-trash text-danger"></i>
+                                    <em>Сообщение удалено</em>
+                                </p>
+                            {% else %}
+                                {% if msg.text %}
+                                    <p class="mb-1">{{ msg.text|safe }}</p>
+                                {% endif %}
+                                {% if msg.media_type %}
+                                    <p class="mb-1">
+                                        <span class="badge bg-info">
+                                            <i class="bi bi-paperclip"></i> {{ msg.media_type }}
+                                        </span>
+                                    </p>
+                                {% endif %}
+                            {% endif %}
+                            
+                            <div class="text-muted small">
+                                <i class="bi bi-clock"></i> {{ msg.date }}
+                                {% if msg.views %}
+                                    <span class="ms-3">
+                                        <i class="bi bi-eye"></i> {{ msg.views }}
+                                    </span>
+                                {% endif %}
+                                {% if msg.forwards %}
+                                    <span class="ms-3">
+                                        <i class="bi bi-arrow-repeat"></i> {{ msg.forwards }}
+                                    </span>
+                                {% endif %}
+                                {% if msg.edit_count > 0 %}
+                                    <span class="ms-3 text-warning">
+                                        <i class="bi bi-pencil"></i> Изменено {{ msg.edit_count }} раз
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div>
+                            <span class="badge bg-secondary">
+                                #{{ msg.id }}
+                            </span>
+                            {% if msg.reply_to_msg_id %}
+                                <span class="badge bg-primary ms-1">
+                                    <i class="bi bi-reply"></i> {{ msg.reply_to_msg_id }}
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            
+            <!-- Пагинация -->
+            {% if total_pages > 1 %}
+            <nav aria-label="Навигация по страницам">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                        <a class="page-link" href="?page={{ page - 1 }}&per_page={{ per_page }}">
+                            <i class="bi bi-chevron-left"></i> Назад
+                        </a>
+                    </li>
+                    
+                    {% for p in range(1, total_pages + 1) %}
+                        {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                            <li class="page-item {% if p == page %}active{% endif %}">
+                                <a class="page-link" href="?page={{ p }}&per_page={{ per_page }}">{{ p }}</a>
+                            </li>
+                        {% elif p == page - 3 or p == page + 3 %}
+                            <li class="page-item disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+                        <a class="page-link" href="?page={{ page + 1 }}&per_page={{ per_page }}">
+                            Вперед <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox fs-1 text-muted"></i>
+                <h5 class="text-muted mt-3">Нет сообщений</h5>
+                <p class="text-muted">У этого пользователя нет сообщений в данном чате</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.message-card {
+    transition: all 0.3s ease;
+}
+.message-card:hover {
+    box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+}
+.deleted-message {
+    opacity: 0.6;
+    border-color: #dc3545;
+}
+.deleted-message.d-none {
+    display: none !important;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Фильтрация сообщений
+document.getElementById('messageFilter').addEventListener('input', function() {
+    const filter = this.value.toLowerCase();
+    const messages = document.querySelectorAll('.message-card');
+    
+    messages.forEach(msg => {
+        const text = msg.dataset.text;
+        msg.style.display = text.includes(filter) ? '' : 'none';
+    });
+});
+
+// Изменение количества сообщений на странице
+document.getElementById('perPageSelect').addEventListener('change', function() {
+    const url = new URL(window.location);
+    url.searchParams.set('per_page', this.value);
+    url.searchParams.set('page', '1'); // Сбрасываем на первую страницу
+    window.location = url;
+});
+
+// Показать/скрыть удаленные сообщения
+document.getElementById('showDeleted').addEventListener('click', function() {
+    const isShowing = this.dataset.show === 'true';
+    const deletedMessages = document.querySelectorAll('.deleted-message');
+    
+    if (isShowing) {
+        // Скрываем удаленные
+        deletedMessages.forEach(msg => msg.classList.add('d-none'));
+        this.dataset.show = 'false';
+        this.innerHTML = '<i class="bi bi-trash"></i> Показать удаленные';
+        this.classList.remove('btn-danger');
+        this.classList.add('btn-outline-secondary');
+    } else {
+        // Показываем удаленные
+        deletedMessages.forEach(msg => msg.classList.remove('d-none'));
+        this.dataset.show = 'true';
+        this.innerHTML = '<i class="bi bi-trash-fill"></i> Скрыть удаленные';
+        this.classList.remove('btn-outline-secondary');
+        this.classList.add('btn-danger');
+    }
+});
+
+// Скрываем удаленные по умолчанию
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.deleted-message').forEach(msg => msg.classList.add('d-none'));
+});
+</script>
+{% endblock %}
