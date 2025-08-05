@@ -177,55 +177,93 @@ class TelegramAnalytics:
             results = conn.execute(query).fetchall()
             return [dict(row) for row in results]
 
-    def get_message_changes_analytics(self) -> Dict:
+    def get_message_changes_analytics(self, chat_id: int = None) -> Dict:
         """
         Анализ изменений сообщений (редактирования, удаления)
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
+            
+            # Фильтр для конкретного чата
+            chat_filter = ""
+            params = []
+            if chat_id:
+                chat_filter = "WHERE chat_id = ?"
+                params = [chat_id]
 
             # Общая статистика изменений
-            changes_stats = conn.execute('''
+            changes_stats = conn.execute(f'''
                 SELECT
                     action_type,
                     COUNT(*) as count,
                     COUNT(DISTINCT chat_id) as affected_chats,
                     COUNT(DISTINCT message_id) as affected_messages
                 FROM message_history
+                {chat_filter}
                 GROUP BY action_type
-            ''').fetchall()
+            ''', params).fetchall()
 
             # Чаты с наибольшим количеством изменений
-            most_edited_chats = conn.execute('''
-                SELECT
-                    c.name as chat_name,
-                    COUNT(mh.id) as total_changes,
-                    COUNT(CASE WHEN mh.action_type = 'edited' THEN 1 END) as edits,
-                    COUNT(CASE WHEN mh.action_type = 'deleted' THEN 1 END) as deletions
-                FROM message_history mh
-                JOIN chats c ON mh.chat_id = c.id
-                GROUP BY c.id, c.name
-                ORDER BY total_changes DESC
-                LIMIT 10
-            ''').fetchall()
+            if chat_id:
+                # Для конкретного чата показываем статистику по дням
+                most_edited_chats = conn.execute('''
+                    SELECT
+                        DATE(timestamp) as date,
+                        COUNT(*) as total_changes,
+                        COUNT(CASE WHEN action_type = 'edited' THEN 1 END) as edits,
+                        COUNT(CASE WHEN action_type = 'deleted' THEN 1 END) as deletions
+                    FROM message_history
+                    WHERE chat_id = ?
+                    GROUP BY DATE(timestamp)
+                    ORDER BY date DESC
+                    LIMIT 30
+                ''', [chat_id]).fetchall()
+            else:
+                most_edited_chats = conn.execute('''
+                    SELECT
+                        c.name as chat_name,
+                        COUNT(mh.id) as total_changes,
+                        COUNT(CASE WHEN mh.action_type = 'edited' THEN 1 END) as edits,
+                        COUNT(CASE WHEN mh.action_type = 'deleted' THEN 1 END) as deletions
+                    FROM message_history mh
+                    JOIN chats c ON mh.chat_id = c.id
+                    GROUP BY c.id, c.name
+                    ORDER BY total_changes DESC
+                    LIMIT 10
+                ''').fetchall()
 
             # Активность изменений по времени (последние 30 дней)
-            recent_changes = conn.execute('''
+            recent_changes_query = f'''
                 SELECT
                     DATE(timestamp) as date,
                     action_type,
                     COUNT(*) as count
                 FROM message_history
-                WHERE timestamp > datetime('now', '-30 days')
+                {chat_filter}
+                {"AND" if chat_filter else "WHERE"} timestamp > datetime('now', '-30 days')
                 GROUP BY DATE(timestamp), action_type
                 ORDER BY date DESC
-            ''').fetchall()
+            '''
+            recent_changes = conn.execute(recent_changes_query, params).fetchall()
 
             return {
                 'changes_summary': [dict(row) for row in changes_stats],
                 'most_active_chats': [dict(row) for row in most_edited_chats],
                 'recent_activity': [dict(row) for row in recent_changes]
             }
+    
+    def get_chat_changes_count(self, chat_id: int) -> int:
+        """
+        Получает количество изменений для конкретного чата
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            result = conn.execute('''
+                SELECT COUNT(*) as count
+                FROM message_history
+                WHERE chat_id = ?
+            ''', (chat_id,)).fetchone()
+            
+            return result['count'] if result else 0
 
     def get_chat_statistics(self, chat_id: int) -> Dict:
         """
@@ -277,7 +315,8 @@ class TelegramAnalytics:
                 'time_analysis': self.get_activity_by_time(chat_id),
                 'topic_analysis': self.analyze_conversation_topics(chat_id),
                 'user_stats': self.get_user_statistics(chat_id),
-                'changes_analytics': self.get_message_changes_analytics()
+                'changes_analytics': self.get_message_changes_analytics(chat_id),
+                'changes_count': self.get_chat_changes_count(chat_id)
             }
 
             return report

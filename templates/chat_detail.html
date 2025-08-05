@@ -166,8 +166,8 @@
             <div class="card-body">
                 <i class="bi bi-pencil-square fs-1 mb-2"></i>
                 <h4>
-                    {% if report.changes_analytics and report.changes_analytics.changes_summary %}
-                        {{ report.changes_analytics.changes_summary | sum(attribute='count') }}
+                    {% if report.changes_count %}
+                        {{ report.changes_count }}
                     {% else %}
                         0
                     {% endif %}
@@ -203,6 +203,11 @@
     <li class="nav-item" role="presentation">
         <button class="nav-link" id="time-tab" data-bs-toggle="tab" data-bs-target="#time" type="button">
             <i class="bi bi-clock"></i> Время
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="messages-tab" data-bs-toggle="tab" data-bs-target="#messages" type="button">
+            <i class="bi bi-chat-text"></i> Сообщения
         </button>
     </li>
 </ul>
@@ -614,6 +619,34 @@
                     </div>
                     <div class="card-body">
                         <canvas id="chatWeeklyChart" height="250"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Сообщения -->
+    <div class="tab-pane fade" id="messages" role="tabpanel">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="bi bi-chat-text"></i> Последние сообщения
+                            </h5>
+                            <a href="{{ url_for('chat_messages', chat_id=chat_id) }}" class="btn btn-sm btn-primary">
+                                <i class="bi bi-arrow-right"></i> Все сообщения
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-body" id="messagesContainer">
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Загрузка...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Загрузка сообщений...</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1091,6 +1124,108 @@ function startStatusPolling(chatId) {
         }
     }, 2000);
 }
+
+// Функция загрузки сообщений
+async function loadMessages() {
+    const container = document.getElementById('messagesContainer');
+    
+    try {
+        const response = await fetch(`/api/chat/${chatId}/messages-with-changes?limit=20`);
+        const data = await response.json();
+        
+        if (data.success && data.messages.length > 0) {
+            let html = '<div class="messages-list">';
+            
+            data.messages.forEach(msg => {
+                const isDeleted = msg.is_deleted;
+                const hasChanges = msg.edit_count > 0 || isDeleted;
+                
+                html += `
+                    <div class="message-item mb-3 p-3 border rounded ${isDeleted ? 'border-danger bg-danger bg-opacity-10' : hasChanges ? 'border-warning' : ''}">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <strong>${msg.first_name || msg.username || 'Unknown'}</strong>
+                                <small class="text-muted ms-2">#${msg.id}</small>
+                            </div>
+                            <small class="text-muted">${new Date(msg.date).toLocaleString('ru-RU')}</small>
+                        </div>
+                        ${isDeleted && msg.deletion_time ? `
+                            <div class="alert alert-danger py-1 px-2 mb-2">
+                                <small><i class="bi bi-trash"></i> Удалено: ${new Date(msg.deletion_time).toLocaleString('ru-RU')}</small>
+                            </div>
+                        ` : ''}
+                        ${msg.text ? `<p class="mb-1 ${isDeleted ? 'text-decoration-line-through text-muted' : ''}">${msg.text}</p>` : ''}
+                        ${msg.previous_text && msg.edit_count > 0 ? `
+                            <details class="mb-2">
+                                <summary class="text-warning small" style="cursor: pointer;">
+                                    <i class="bi bi-pencil"></i> Изменено ${msg.edit_count} раз
+                                </summary>
+                                <div class="mt-1 ps-3 border-start border-warning">
+                                    <small class="text-muted">Предыдущий текст:</small>
+                                    <p class="mb-0 small text-muted text-decoration-line-through">${msg.previous_text}</p>
+                                    ${msg.last_edit_time ? `<small class="text-muted">Изменено: ${new Date(msg.last_edit_time).toLocaleString('ru-RU')}</small>` : ''}
+                                </div>
+                            </details>
+                        ` : msg.edit_count > 0 ? `
+                            <small class="text-warning">
+                                <i class="bi bi-pencil"></i> Изменено ${msg.edit_count} раз
+                                ${msg.last_edit_time ? ` (${new Date(msg.last_edit_time).toLocaleString('ru-RU')})` : ''}
+                            </small>
+                        ` : ''}
+                        ${msg.media_type ? `<p class="text-muted mb-1"><i class="bi bi-paperclip"></i> ${msg.media_type}</p>` : ''}
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            if (data.has_more) {
+                html += `
+                    <div class="text-center mt-3">
+                        <a href="${urlFor('chat_messages', {chat_id: chatId})}" class="btn btn-outline-primary">
+                            <i class="bi bi-arrow-down"></i> Показать все сообщения
+                        </a>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox fs-1 text-muted"></i>
+                    <p class="text-muted mt-2">Нет сообщений для отображения</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading messages:', error);
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                Ошибка загрузки сообщений: ${error.message}
+            </div>
+        `;
+    }
+}
+
+// URL helper
+function urlFor(route, params) {
+    const routes = {
+        'chat_messages': '/chat/[chat_id]/messages'
+    };
+    
+    let url = routes[route] || '/';
+    for (const [key, value] of Object.entries(params || {})) {
+        url = url.replace(`[${key}]`, value);
+    }
+    return url;
+}
+
+// Загружаем сообщения при переключении на вкладку
+document.getElementById('messages-tab')?.addEventListener('shown.bs.tab', function() {
+    loadMessages();
+});
 
 // Останавливаем polling при закрытии страницы
 window.addEventListener('beforeunload', () => {

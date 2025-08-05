@@ -996,6 +996,7 @@ def api_get_chat_messages_with_changes(chat_id):
                     m.date,
                     m.is_deleted,
                     m.sender_id,
+                    m.media_type,
                     u.username,
                     u.first_name,
                     u.last_name,
@@ -1007,6 +1008,10 @@ def api_get_chat_messages_with_changes(chat_id):
                     (SELECT MAX(timestamp) FROM message_history 
                      WHERE message_id = m.id AND chat_id = m.chat_id 
                      AND action_type = 'edited') as last_edit_time,
+                    (SELECT timestamp FROM message_history 
+                     WHERE message_id = m.id AND chat_id = m.chat_id 
+                     AND action_type = 'deleted'
+                     ORDER BY timestamp DESC LIMIT 1) as deletion_time,
                     (SELECT old_text FROM message_history 
                      WHERE message_id = m.id AND chat_id = m.chat_id 
                      AND action_type = 'edited'
@@ -1046,10 +1051,20 @@ def api_get_chat_messages_with_changes(chat_id):
                 [chat_id]
             ).fetchone()
         
+        # Добавляем флаг has_more для удобства
+        has_more = page * per_page < total_count
+        
+        # Получаем limit из параметров для обратной совместимости
+        limit = request.args.get('limit', type=int)
+        if limit:
+            messages = messages[:limit]
+            has_more = len(messages) == limit
+        
         return jsonify({
             'success': True,
             'chat': dict(chat_info) if chat_info else None,
             'messages': [dict(m) for m in messages],
+            'has_more': has_more,
             'pagination': {
                 'page': page,
                 'per_page': per_page,
