@@ -108,9 +108,9 @@
                             </thead>
                             <tbody>
                                 {% for chat in chats %}
-                                <tr data-chat-type="{{ chat.type }}" data-chat-name="{{ chat.name|lower }}">
+                                <tr data-chat-type="{{ chat.type }}" data-chat-name="{{ chat.name|lower }}" data-chat-id="{{ chat.id }}" class="chat-row" style="cursor: pointer;">
                                     <td>{{ loop.index }}</td>
-                                    <td>
+                                    <td onclick="loadChatStats({{ chat.id }})" data-bs-toggle="modal" data-bs-target="#chatStatsModal">
                                         <div class="d-flex align-items-center">
                                             {% if chat.type == 'User' %}
                                                 <i class="bi bi-person-circle text-success me-2"></i>
@@ -129,22 +129,22 @@
                                             </div>
                                         </div>
                                     </td>
-                                    <td>
+                                    <td onclick="loadChatStats({{ chat.id }})" data-bs-toggle="modal" data-bs-target="#chatStatsModal">
                                         <span class="badge bg-secondary">{{ chat.type }}</span>
                                     </td>
-                                    <td>
+                                    <td onclick="loadChatStats({{ chat.id }})" data-bs-toggle="modal" data-bs-target="#chatStatsModal">
                                         <span class="badge bg-primary">
                                             {{ "{:,}".format(chat.total_messages) }}
                                         </span>
                                     </td>
-                                    <td>
+                                    <td onclick="loadChatStats({{ chat.id }})" data-bs-toggle="modal" data-bs-target="#chatStatsModal">
                                         {% if chat.unique_senders %}
                                             <span class="badge bg-info">{{ chat.unique_senders }}</span>
                                         {% else %}
                                             <span class="text-muted">N/A</span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td onclick="loadChatStats({{ chat.id }})" data-bs-toggle="modal" data-bs-target="#chatStatsModal">
                                         {% set edits = chat.edited_count or 0 %}
                                         {% set deletes = chat.deleted_count or 0 %}
                                         {% if edits + deletes > 0 %}
@@ -153,7 +153,7 @@
                                             <span class="text-muted">0</span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td onclick="loadChatStats({{ chat.id }})" data-bs-toggle="modal" data-bs-target="#chatStatsModal">
                                         {% if chat.last_message %}
                                             <small class="text-muted">
                                                 {{ chat.last_message[:10] }}
@@ -165,25 +165,25 @@
                                     <td>
                                         <div class="btn-group" role="group">
                                             <a href="{{ url_for('chat_detail', chat_id=chat.id) }}" 
-                                               class="btn btn-sm btn-outline-primary" 
+                                               class="btn btn-sm btn-primary" 
                                                data-bs-toggle="tooltip" 
-                                               title="Детали чата">
-                                                <i class="bi bi-eye"></i>
+                                               title="Полная аналитика">
+                                                <i class="bi bi-bar-chart-line"></i> Аналитика
                                             </a>
+                                            <button class="btn btn-sm btn-outline-info" 
+                                                    onclick="loadChatStats({{ chat.id }})"
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#chatStatsModal"
+                                                    data-bs-toggle="tooltip" 
+                                                    title="Быстрый просмотр">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
                                             <button class="btn btn-sm btn-outline-success" 
                                                     data-export-type="chat" 
                                                     data-chat-id="{{ chat.id }}"
                                                     data-bs-toggle="tooltip" 
                                                     title="Экспорт для AI">
                                                 <i class="bi bi-robot"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-info" 
-                                                    onclick="loadChatStats({{ chat.id }})"
-                                                    data-bs-toggle="modal" 
-                                                    data-bs-target="#chatStatsModal"
-                                                    data-bs-toggle="tooltip" 
-                                                    title="Быстрая статистика">
-                                                <i class="bi bi-graph-up"></i>
                                             </button>
                                         </div>
                                     </td>
@@ -206,11 +206,11 @@
 
 <!-- Modal для быстрой статистики -->
 <div class="modal fade" id="chatStatsModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="bi bi-graph-up"></i> Статистика чата
+                    <i class="bi bi-graph-up"></i> <span id="modalChatName">Статистика чата</span>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -221,11 +221,37 @@
                 </div>
             </div>
             <div class="modal-footer">
+                <a href="#" id="viewFullAnalytics" class="btn btn-primary">
+                    <i class="bi bi-bar-chart-line"></i> Полная аналитика
+                </a>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.chat-row:hover {
+    background-color: rgba(0,0,0,0.02);
+}
+.chat-row td:not(:last-child) {
+    cursor: pointer;
+}
+.table-responsive {
+    max-height: 300px;
+    overflow-y: auto;
+}
+#chatStatsModal .card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+}
+#chatStatsModal .card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
@@ -273,44 +299,121 @@ function sortChats() {
 // Загрузка статистики чата
 async function loadChatStats(chatId) {
     const content = document.getElementById('chatStatsContent');
+    const modalTitle = document.getElementById('modalChatName');
+    const fullAnalyticsBtn = document.getElementById('viewFullAnalytics');
+    
+    // Устанавливаем ссылку для полной аналитики
+    fullAnalyticsBtn.href = `/chat/${chatId}`;
     
     try {
         const response = await fetch(`/api/chat-stats/${chatId}`);
         const data = await response.json();
         
         if (response.ok) {
+            // Обновляем заголовок
+            modalTitle.textContent = `Статистика: ${data.basic_stats.chat_name}`;
+            
+            // Получаем дополнительные данные об изменениях
+            const changesResponse = await fetch(`/api/message-changes/${chatId}?limit=10`);
+            const changesData = await changesResponse.json();
+            
             content.innerHTML = `
                 <div class="row">
-                    <div class="col-md-6">
-                        <h6>Основная информация</h6>
-                        <ul class="list-unstyled">
-                            <li><strong>Название:</strong> ${data.basic_stats.name}</li>
-                            <li><strong>Тип:</strong> ${data.basic_stats.type}</li>
-                            <li><strong>Сообщений:</strong> ${data.basic_stats.total_messages.toLocaleString()}</li>
-                            <li><strong>Участников:</strong> ${data.basic_stats.unique_senders || 'N/A'}</li>
-                        </ul>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">Основная информация</h6>
+                                <ul class="list-unstyled mb-0">
+                                    <li class="mb-2">
+                                        <i class="bi bi-chat-dots text-primary"></i>
+                                        <strong>Тип:</strong> 
+                                        <span class="badge bg-secondary">${data.basic_stats.chat_type}</span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="bi bi-envelope text-info"></i>
+                                        <strong>Сообщений:</strong> 
+                                        <span class="badge bg-primary">${data.basic_stats.message_count.toLocaleString()}</span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="bi bi-people text-success"></i>
+                                        <strong>Участников:</strong> 
+                                        <span class="badge bg-info">${data.basic_stats.unique_users || 'N/A'}</span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="bi bi-calendar text-warning"></i>
+                                        <strong>Активных дней:</strong> 
+                                        <span class="badge bg-warning text-dark">${data.basic_stats.active_days || 0}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <h6>Активность по времени</h6>
-                        <canvas id="modalTimeChart" height="150"></canvas>
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">Активность по времени</h6>
+                                <canvas id="modalTimeChart" height="200"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
+                ${changesData.success && changesData.changes.length > 0 ? `
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    Последние изменения
+                                    <span class="badge bg-warning">${changesData.total}</span>
+                                </h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Тип</th>
+                                                <th>Сообщение</th>
+                                                <th>Время</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${changesData.changes.slice(0, 5).map(change => `
+                                                <tr>
+                                                    <td>
+                                                        <span class="badge bg-${change.change_type === 'edited' ? 'info' : 'danger'}">
+                                                            ${change.change_type === 'edited' ? 'Изменено' : 'Удалено'}
+                                                        </span>
+                                                    </td>
+                                                    <td class="text-truncate" style="max-width: 300px;">
+                                                        ${change.text || change.old_text || 'N/A'}
+                                                    </td>
+                                                    <td>
+                                                        <small>${new Date(change.timestamp).toLocaleString('ru-RU')}</small>
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
             `;
             
             // Создаем график
             if (data.time_analysis && data.time_analysis.by_hour) {
                 const ctx = document.getElementById('modalTimeChart').getContext('2d');
                 new Chart(ctx, {
-                    type: 'line',
+                    type: 'bar',
                     data: {
                         labels: data.time_analysis.by_hour.map(h => h.hour + ':00'),
                         datasets: [{
                             label: 'Сообщений',
                             data: data.time_analysis.by_hour.map(h => h.count),
+                            backgroundColor: 'rgba(13, 110, 253, 0.8)',
                             borderColor: 'rgba(13, 110, 253, 1)',
-                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                            fill: true,
-                            tension: 0.4
+                            borderWidth: 1
                         }]
                     },
                     options: {

@@ -5,12 +5,31 @@
 {% block content %}
 <div class="row">
     <div class="col-12">
-        <h1 class="mb-4">
-            <i class="bi bi-emoji-smile"></i> Статистика эмодзи и выражений
-        </h1>
-        <p class="lead text-muted">
-            Анализ использования эмодзи, текстовых смайликов и стикеров в ваших чатах.
-        </p>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="mb-2">
+                    <i class="bi bi-emoji-smile"></i> Статистика эмодзи и выражений
+                </h1>
+                <p class="lead text-muted mb-0">
+                    Анализ использования эмодзи, текстовых смайликов и стикеров {% if selected_chat_id %}в выбранном чате{% else %}во всех чатах{% endif %}.
+                </p>
+            </div>
+            <div>
+                <form method="get" action="{{ url_for('emoji_stats') }}" class="d-flex gap-2">
+                    <select name="chat_id" class="form-select" onchange="this.form.submit()">
+                        <option value="">Все чаты</option>
+                        {% for chat in chats_list %}
+                        <option value="{{ chat.chat_id }}" {% if chat.chat_id == selected_chat_id %}selected{% endif %}>
+                            {{ chat.chat_name[:50] }}{% if chat.chat_name|length > 50 %}...{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-funnel"></i> Применить
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 

@@ -90,6 +90,78 @@
     </div>
 </div>
 
+<!-- Статус синхронизации -->
+{% if sync_status %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-arrow-repeat"></i> Статус синхронизации
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6>Последняя синхронизация:</h6>
+                        {% if sync_status.last_session %}
+                            <p class="mb-1">
+                                <i class="bi bi-calendar-check"></i> 
+                                <strong>{{ sync_status.last_session.start_time }}</strong>
+                            </p>
+                            <p class="mb-1">
+                                <i class="bi bi-chat-dots"></i> 
+                                Чатов: <span class="badge bg-primary">{{ sync_status.last_session.total_chats or 0 }}</span>
+                            </p>
+                            <p class="mb-0">
+                                <i class="bi bi-envelope"></i> 
+                                Сообщений: <span class="badge bg-success">{{ sync_status.last_session.total_messages or 0 }}</span>
+                                {% if sync_status.last_session.changes_detected %}
+                                    <span class="badge bg-warning">{{ sync_status.last_session.changes_detected }} изменений</span>
+                                {% endif %}
+                            </p>
+                        {% else %}
+                            <p class="text-muted">Нет данных о синхронизации</p>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Период сообщений:</h6>
+                        {% if sync_status.message_range and sync_status.message_range.first_message %}
+                            <p class="mb-1">
+                                <i class="bi bi-calendar-range"></i>
+                                С: <strong>{{ sync_status.message_range.first_message[:10] }}</strong>
+                            </p>
+                            <p class="mb-0">
+                                <i class="bi bi-calendar-range-fill"></i>
+                                По: <strong>{{ sync_status.message_range.last_message[:10] }}</strong>
+                            </p>
+                        {% else %}
+                            <p class="text-muted">Нет сообщений</p>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <h6>Действия:</h6>
+                        {% if sync_status.is_parsing %}
+                            <button class="btn btn-warning" disabled>
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                Парсинг выполняется...
+                            </button>
+                        {% else %}
+                            <button class="btn btn-success" onclick="startQuickParsing('check_changes')">
+                                <i class="bi bi-arrow-clockwise"></i> Проверить изменения
+                            </button>
+                            <button class="btn btn-primary" onclick="startQuickParsing('all')">
+                                <i class="bi bi-download"></i> Полная синхронизация
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Мониторинг статуса -->
 <div class="row mb-4">
     <div class="col-12">
@@ -305,6 +377,63 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+// Функция для быстрого запуска парсинга
+async function startQuickParsing(type) {
+    const button = event.target;
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Запуск...';
+    
+    try {
+        const response = await fetch('/api/start-parsing', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                type: type,
+                options: {
+                    force_full_scan: type === 'all'
+                }
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Показываем уведомление
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+            alert.style.zIndex = '9999';
+            alert.innerHTML = `
+                <i class="bi bi-check-circle me-2"></i>
+                ${type === 'check_changes' ? 'Проверка изменений запущена' : 'Полная синхронизация запущена'}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alert);
+            
+            // Удаляем уведомление через 5 секунд
+            setTimeout(() => alert.remove(), 5000);
+            
+            // Обновляем страницу через 2 секунды
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            alert('Ошибка запуска: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error.message);
+    } finally {
+        // Восстанавливаем кнопку
+        if (type === 'check_changes') {
+            button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Проверить изменения';
+        } else {
+            button.innerHTML = '<i class="bi bi-download"></i> Полная синхронизация';
+        }
+        button.disabled = false;
+    }
+}
+</script>
+
 {% if stats %}
 <script>
 // График активности чатов

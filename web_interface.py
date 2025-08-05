@@ -75,6 +75,55 @@ def transform_chat_data(raw_chat):
         'deleted_count': raw_chat.get('deleted_count', 0)
     }
 
+def get_sync_status():
+    """Получает информацию о последней синхронизации"""
+    if not db:
+        return None
+    
+    try:
+        with sqlite3.connect(db.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            # Получаем последнюю сессию парсинга
+            last_session = conn.execute('''
+                SELECT id, start_time, end_time, total_chats, total_messages, changes_detected
+                FROM scan_sessions
+                ORDER BY start_time DESC
+                LIMIT 1
+            ''').fetchone()
+            
+            # Получаем статистику по датам обновления чатов
+            chat_updates = conn.execute('''
+                SELECT 
+                    MIN(last_updated) as oldest_update,
+                    MAX(last_updated) as newest_update,
+                    COUNT(*) as total_chats
+                FROM chats
+            ''').fetchone()
+            
+            # Получаем диапазон дат сообщений
+            message_range = conn.execute('''
+                SELECT 
+                    MIN(date) as first_message,
+                    MAX(date) as last_message,
+                    COUNT(*) as total_messages
+                FROM messages
+                WHERE is_deleted = FALSE
+            ''').fetchone()
+            
+            if not last_session and not chat_updates:
+                return None
+                
+            return {
+                'last_session': dict(last_session) if last_session else None,
+                'chat_updates': dict(chat_updates) if chat_updates else None,
+                'message_range': dict(message_range) if message_range else None,
+                'is_parsing': StatusManager.get_status() is not None
+            }
+    except Exception as e:
+        print(f"Ошибка получения статуса синхронизации: {e}")
+        return None
+
 @app.route('/')
 def index():
     """Главная страница"""
@@ -95,15 +144,19 @@ def index():
 
         # Последние изменения
         changes_summary = analytics.get_message_changes_analytics()
+        
+        # Получаем информацию о последней синхронизации
+        sync_status = get_sync_status()
 
         return render_template('dashboard.html',
                              stats=stats,
                              total_chats=total_chats,
                              total_messages=total_messages,
-                             changes_summary=changes_summary)
+                             changes_summary=changes_summary,
+                             sync_status=sync_status)
     except Exception as e:
         flash(f'Ошибка загрузки данных: {e}', 'error')
-        return render_template('dashboard.html', stats=[], total_chats=0, total_messages=0)
+        return render_template('dashboard.html', stats=[], total_chats=0, total_messages=0, sync_status=None)
 
 @app.route('/chats')
 def chats():
@@ -163,41 +216,55 @@ def analytics_page():
         return redirect(url_for('index'))
 
     try:
-        # Активные чаты
-        raw_active_chats = analytics.get_most_active_chats(limit=15)
+        # Получаем ID чата из параметров запроса
+        chat_id = request.args.get('chat_id', type=int)
         
-        # Преобразуем данные к ожидаемому формату
-        active_chats = []
-        for chat in raw_active_chats:
-            active_chats.append({
-                'chat_name': chat['chat_name'],
-                'chat_type': chat['chat_type'],
-                'message_count': chat['message_count'],
-                'unique_users': chat['unique_users'],
-                'active_days': chat.get('active_days', 0)
-            })
+        # Получаем список чатов для селектора
+        chats_list = analytics.get_most_active_chats(limit=1000) if analytics else []
+        
+        # Если выбран чат, показываем только его статистику
+        if chat_id:
+            # Получаем информацию о конкретном чате
+            chat_stats = next((c for c in chats_list if c['chat_id'] == chat_id), None)
+            active_chats = [chat_stats] if chat_stats else []
+        else:
+            # Активные чаты - топ 15
+            raw_active_chats = analytics.get_most_active_chats(limit=15)
+            active_chats = []
+            for chat in raw_active_chats:
+                active_chats.append({
+                    'chat_name': chat['chat_name'],
+                    'chat_type': chat['chat_type'],
+                    'message_count': chat['message_count'],
+                    'unique_users': chat['unique_users'],
+                    'active_days': chat.get('active_days', 0)
+                })
 
         # Анализ времени
-        time_analysis = analytics.get_activity_by_time()
+        time_analysis = analytics.get_activity_by_time(chat_id)
 
         # Топ темы
-        topics = analytics.analyze_conversation_topics()
+        topics = analytics.analyze_conversation_topics(chat_id)
 
         # Изменения
-        changes = analytics.get_message_changes_analytics()
+        changes = analytics.get_message_changes_analytics(chat_id)
 
         return render_template('analytics.html',
                              active_chats=active_chats,
                              time_analysis=time_analysis,
                              topics=topics,
-                             changes=changes)
+                             changes=changes,
+                             selected_chat_id=chat_id,
+                             chats_list=chats_list)
     except Exception as e:
         flash(f'Ошибка загрузки аналитики: {e}', 'error')
         return render_template('analytics.html', 
                              active_chats=[], 
                              time_analysis={'by_hour': [], 'by_weekday': []},
                              topics={'top_words': [], 'total_messages_analyzed': 0, 'unique_words': 0},
-                             changes={})
+                             changes={},
+                             selected_chat_id=None,
+                             chats_list=[])
 
 @app.route('/emoji-stats')
 def emoji_stats():
@@ -206,11 +273,37 @@ def emoji_stats():
         return redirect(url_for('index'))
 
     try:
-        emoji_analysis = analytics.analyze_emoji_and_expressions()
-        return render_template('emoji_stats.html', emoji_analysis=emoji_analysis)
+        # Получаем ID чата из параметров запроса
+        chat_id = request.args.get('chat_id', type=int)
+        
+        # Получаем список чатов для селектора
+        chats_list = analytics.get_most_active_chats(limit=1000) if analytics else []
+        
+        # Анализируем эмодзи для выбранного чата или всех чатов
+        emoji_analysis = analytics.analyze_emoji_and_expressions(chat_id)
+        
+        # Проверяем что данные получены корректно
+        if not emoji_analysis or not isinstance(emoji_analysis, dict):
+            emoji_analysis = {
+                'user_expression_stats': [],
+                'global_stats': {
+                    'most_used_emojis': [],
+                    'most_used_text_smilies': [],
+                    'total_unique_emojis': 0,
+                    'total_messages_analyzed': 0
+                }
+            }
+        
+        return render_template('emoji_stats.html', 
+                             emoji_analysis=emoji_analysis,
+                             selected_chat_id=chat_id,
+                             chats_list=chats_list)
     except Exception as e:
         flash(f'Ошибка загрузки статистики эмодзи: {e}', 'error')
-        return render_template('emoji_stats.html', emoji_analysis=None)
+        return render_template('emoji_stats.html', 
+                             emoji_analysis=None,
+                             selected_chat_id=None,
+                             chats_list=[])
 
 @app.route('/conversation-starters')
 def conversation_starters():
