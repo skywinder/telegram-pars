@@ -81,13 +81,123 @@
     </div>
 </div>
 
+<!-- Недавние чаты -->
+{% if recent_chats %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-primary">
+            <div class="card-header bg-primary bg-opacity-10">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history"></i> Недавние чаты
+                    </h5>
+                    <button class="btn btn-sm btn-outline-danger" onclick="clearRecentChats()">
+                        <i class="bi bi-trash"></i> Очистить
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for chat in recent_chats[:8] %}
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card h-100 recent-chat-card">
+                            <div class="card-body d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0 text-truncate" style="max-width: 70%;">
+                                        {% if chat.type == 'User' %}
+                                            <i class="bi bi-person-circle text-success"></i>
+                                        {% elif chat.type == 'Chat' %}
+                                            <i class="bi bi-people-fill text-info"></i>
+                                        {% else %}
+                                            <i class="bi bi-broadcast text-warning"></i>
+                                        {% endif %}
+                                        {{ chat.name[:20] }}{% if chat.name|length > 20 %}...{% endif %}
+                                    </h6>
+                                    <button class="btn btn-sm btn-link text-danger p-0" 
+                                            onclick="removeFromRecent({{ chat.id }})" 
+                                            title="Удалить из недавних">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block mb-2">
+                                    <i class="bi bi-eye"></i> {{ chat.visit_count }} просмотров
+                                </small>
+                                <small class="text-muted d-block mb-3">
+                                    <i class="bi bi-clock"></i> {{ chat.last_visited[:16] }}
+                                </small>
+                                <a href="{{ url_for('chat_detail', chat_id=chat.id) }}" 
+                                   class="btn btn-sm btn-primary mt-auto w-100">
+                                    <i class="bi bi-bar-chart-line"></i> Открыть
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Избранные чаты -->
+{% if favorite_chats %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-warning">
+            <div class="card-header bg-warning bg-opacity-10">
+                <h5 class="mb-0">
+                    <i class="bi bi-star-fill text-warning"></i> Избранные чаты
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for chat in favorite_chats %}
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card h-100 favorite-chat-card">
+                            <div class="card-body d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0 text-truncate" style="max-width: 70%;">
+                                        {% if chat.type == 'User' %}
+                                            <i class="bi bi-person-circle text-success"></i>
+                                        {% elif chat.type == 'Chat' %}
+                                            <i class="bi bi-people-fill text-info"></i>
+                                        {% else %}
+                                            <i class="bi bi-broadcast text-warning"></i>
+                                        {% endif %}
+                                        {{ chat.name[:20] }}{% if chat.name|length > 20 %}...{% endif %}
+                                    </h6>
+                                    <button class="btn btn-sm btn-link text-warning p-0" 
+                                            onclick="toggleFavorite({{ chat.id }})" 
+                                            title="Удалить из избранного">
+                                        <i class="bi bi-star-fill"></i>
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block mb-3">
+                                    Добавлен: {{ chat.added_at[:10] }}
+                                </small>
+                                <a href="{{ url_for('chat_detail', chat_id=chat.id) }}" 
+                                   class="btn btn-sm btn-warning mt-auto w-100">
+                                    <i class="bi bi-bar-chart-line"></i> Открыть
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Список чатов -->
 <div class="row">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">
-                    <i class="bi bi-list-ul"></i> Список чатов
+                    <i class="bi bi-list-ul"></i> Все чаты
                 </h5>
             </div>
             <div class="card-body p-0">
@@ -108,9 +218,14 @@
                             </thead>
                             <tbody>
                                 {% for chat in chats %}
-                                <tr data-chat-type="{{ chat.type }}" data-chat-name="{{ chat.name|lower }}" data-chat-id="{{ chat.id }}" class="chat-row" style="cursor: pointer;">
-                                    <td>{{ loop.index }}</td>
-                                    <td onclick="loadChatStats({{ chat.id }})" data-bs-toggle="modal" data-bs-target="#chatStatsModal">
+                                <tr data-chat-type="{{ chat.type }}" data-chat-name="{{ chat.name|lower }}" data-chat-id="{{ chat.id }}" class="chat-row {% if chat.is_recent %}table-info{% endif %}" onclick="window.location.href='{{ url_for('chat_detail', chat_id=chat.id) }}'" style="cursor: pointer;">
+                                    <td>
+                                        {{ loop.index }}
+                                        {% if chat.is_favorite %}
+                                            <i class="bi bi-star-fill text-warning ms-1" title="Избранный"></i>
+                                        {% endif %}
+                                    </td>
+                                    <td>
                                         <div class="d-flex align-items-center">
                                             {% if chat.type == 'User' %}
                                                 <i class="bi bi-person-circle text-success me-2"></i>
@@ -129,22 +244,22 @@
                                             </div>
                                         </div>
                                     </td>
-                                    <td onclick="loadChatStats({{ chat.id }})" data-bs-toggle="modal" data-bs-target="#chatStatsModal">
+                                    <td>
                                         <span class="badge bg-secondary">{{ chat.type }}</span>
                                     </td>
-                                    <td onclick="loadChatStats({{ chat.id }})" data-bs-toggle="modal" data-bs-target="#chatStatsModal">
+                                    <td>
                                         <span class="badge bg-primary">
                                             {{ "{:,}".format(chat.total_messages) }}
                                         </span>
                                     </td>
-                                    <td onclick="loadChatStats({{ chat.id }})" data-bs-toggle="modal" data-bs-target="#chatStatsModal">
+                                    <td>
                                         {% if chat.unique_senders %}
                                             <span class="badge bg-info">{{ chat.unique_senders }}</span>
                                         {% else %}
                                             <span class="text-muted">N/A</span>
                                         {% endif %}
                                     </td>
-                                    <td onclick="loadChatStats({{ chat.id }})" data-bs-toggle="modal" data-bs-target="#chatStatsModal">
+                                    <td>
                                         {% set edits = chat.edited_count or 0 %}
                                         {% set deletes = chat.deleted_count or 0 %}
                                         {% if edits + deletes > 0 %}
@@ -153,7 +268,7 @@
                                             <span class="text-muted">0</span>
                                         {% endif %}
                                     </td>
-                                    <td onclick="loadChatStats({{ chat.id }})" data-bs-toggle="modal" data-bs-target="#chatStatsModal">
+                                    <td>
                                         {% if chat.last_message %}
                                             <small class="text-muted">
                                                 {{ chat.last_message[:10] }}
@@ -162,21 +277,13 @@
                                             <small class="text-muted">N/A</small>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td onclick="event.stopPropagation()">
                                         <div class="btn-group" role="group">
-                                            <a href="{{ url_for('chat_detail', chat_id=chat.id) }}" 
-                                               class="btn btn-sm btn-primary" 
-                                               data-bs-toggle="tooltip" 
-                                               title="Полная аналитика">
-                                                <i class="bi bi-bar-chart-line"></i> Аналитика
-                                            </a>
-                                            <button class="btn btn-sm btn-outline-info" 
-                                                    onclick="loadChatStats({{ chat.id }})"
-                                                    data-bs-toggle="modal" 
-                                                    data-bs-target="#chatStatsModal"
+                                            <button class="btn btn-sm {% if chat.is_favorite %}btn-warning{% else %}btn-outline-warning{% endif %}" 
+                                                    onclick="toggleFavorite({{ chat.id }})"
                                                     data-bs-toggle="tooltip" 
-                                                    title="Быстрый просмотр">
-                                                <i class="bi bi-eye"></i>
+                                                    title="{% if chat.is_favorite %}Удалить из избранного{% else %}Добавить в избранное{% endif %}">
+                                                <i class="bi bi-star{% if not chat.is_favorite %}-fill{% endif %}"></i>
                                             </button>
                                             <button class="btn btn-sm btn-outline-success" 
                                                     data-export-type="chat" 
@@ -204,31 +311,6 @@
     </div>
 </div>
 
-<!-- Modal для быстрой статистики -->
-<div class="modal fade" id="chatStatsModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-graph-up"></i> <span id="modalChatName">Статистика чата</span>
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="chatStatsContent">
-                <div class="text-center py-4">
-                    <div class="loading"></div>
-                    <p class="mt-2">Загрузка статистики...</p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <a href="#" id="viewFullAnalytics" class="btn btn-primary">
-                    <i class="bi bi-bar-chart-line"></i> Полная аналитика
-                </a>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block styles %}
@@ -240,16 +322,25 @@
     cursor: pointer;
 }
 .table-responsive {
-    max-height: 300px;
+    max-height: 600px;
     overflow-y: auto;
 }
-#chatStatsModal .card {
-    box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+.recent-chat-card, .favorite-chat-card {
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0,0,0,0.125);
 }
-#chatStatsModal .card-title {
-    font-size: 0.95rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
+.recent-chat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+    border-color: #0d6efd;
+}
+.favorite-chat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+    border-color: #ffc107;
+}
+.table-info {
+    background-color: rgba(13, 110, 253, 0.05);
 }
 </style>
 {% endblock %}
@@ -296,153 +387,70 @@ function sortChats() {
     rows.forEach(row => tbody.appendChild(row));
 }
 
-// Загрузка статистики чата
-async function loadChatStats(chatId) {
-    const content = document.getElementById('chatStatsContent');
-    const modalTitle = document.getElementById('modalChatName');
-    const fullAnalyticsBtn = document.getElementById('viewFullAnalytics');
-    
-    // Устанавливаем ссылку для полной аналитики
-    fullAnalyticsBtn.href = `/chat/${chatId}`;
-    
+// Управление недавними чатами
+async function removeFromRecent(chatId) {
     try {
-        const response = await fetch(`/api/chat-stats/${chatId}`);
-        const data = await response.json();
-        
-        if (response.ok) {
-            // Обновляем заголовок
-            modalTitle.textContent = `Статистика: ${data.basic_stats.chat_name}`;
-            
-            // Получаем дополнительные данные об изменениях
-            const changesResponse = await fetch(`/api/message-changes/${chatId}?limit=10`);
-            const changesData = await changesResponse.json();
-            
-            content.innerHTML = `
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-body">
-                                <h6 class="card-title">Основная информация</h6>
-                                <ul class="list-unstyled mb-0">
-                                    <li class="mb-2">
-                                        <i class="bi bi-chat-dots text-primary"></i>
-                                        <strong>Тип:</strong> 
-                                        <span class="badge bg-secondary">${data.basic_stats.chat_type}</span>
-                                    </li>
-                                    <li class="mb-2">
-                                        <i class="bi bi-envelope text-info"></i>
-                                        <strong>Сообщений:</strong> 
-                                        <span class="badge bg-primary">${data.basic_stats.message_count.toLocaleString()}</span>
-                                    </li>
-                                    <li class="mb-2">
-                                        <i class="bi bi-people text-success"></i>
-                                        <strong>Участников:</strong> 
-                                        <span class="badge bg-info">${data.basic_stats.unique_users || 'N/A'}</span>
-                                    </li>
-                                    <li class="mb-2">
-                                        <i class="bi bi-calendar text-warning"></i>
-                                        <strong>Активных дней:</strong> 
-                                        <span class="badge bg-warning text-dark">${data.basic_stats.active_days || 0}</span>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-8">
-                        <div class="card">
-                            <div class="card-body">
-                                <h6 class="card-title">Активность по времени</h6>
-                                <canvas id="modalTimeChart" height="200"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                ${changesData.success && changesData.changes.length > 0 ? `
-                <div class="row mt-3">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-body">
-                                <h6 class="card-title">
-                                    Последние изменения
-                                    <span class="badge bg-warning">${changesData.total}</span>
-                                </h6>
-                                <div class="table-responsive">
-                                    <table class="table table-sm">
-                                        <thead>
-                                            <tr>
-                                                <th>Тип</th>
-                                                <th>Сообщение</th>
-                                                <th>Время</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${changesData.changes.slice(0, 5).map(change => `
-                                                <tr>
-                                                    <td>
-                                                        <span class="badge bg-${change.change_type === 'edited' ? 'info' : 'danger'}">
-                                                            ${change.change_type === 'edited' ? 'Изменено' : 'Удалено'}
-                                                        </span>
-                                                    </td>
-                                                    <td class="text-truncate" style="max-width: 300px;">
-                                                        ${change.text || change.old_text || 'N/A'}
-                                                    </td>
-                                                    <td>
-                                                        <small>${new Date(change.timestamp).toLocaleString('ru-RU')}</small>
-                                                    </td>
-                                                </tr>
-                                            `).join('')}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                ` : ''}
-            `;
-            
-            // Создаем график
-            if (data.time_analysis && data.time_analysis.by_hour) {
-                const ctx = document.getElementById('modalTimeChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: data.time_analysis.by_hour.map(h => h.hour + ':00'),
-                        datasets: [{
-                            label: 'Сообщений',
-                            data: data.time_analysis.by_hour.map(h => h.count),
-                            backgroundColor: 'rgba(13, 110, 253, 0.8)',
-                            borderColor: 'rgba(13, 110, 253, 1)',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: { beginAtZero: true }
-                        },
-                        plugins: {
-                            legend: { display: false }
-                        }
-                    }
-                });
+        const response = await fetch(`/api/recent-chat/remove/${chatId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
             }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            location.reload();
         } else {
-            content.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    Ошибка загрузки: ${data.error}
-                </div>
-            `;
+            alert('Ошибка: ' + data.error);
         }
     } catch (error) {
-        content.innerHTML = `
-            <div class="alert alert-danger">
-                <i class="bi bi-exclamation-triangle"></i>
-                Ошибка: ${error.message}
-            </div>
-        `;
+        console.error('Error:', error);
+        alert('Ошибка при удалении из недавних');
+    }
+}
+
+async function clearRecentChats() {
+    if (confirm('Очистить все недавние чаты?')) {
+        try {
+            const response = await fetch('/api/recent-chats/clear', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Ошибка при очистке недавних');
+        }
+    }
+}
+
+// Управление избранными чатами
+async function toggleFavorite(chatId) {
+    try {
+        const response = await fetch(`/api/favorite-chat/toggle/${chatId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Ошибка: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Ошибка при изменении избранного');
     }
 }
 

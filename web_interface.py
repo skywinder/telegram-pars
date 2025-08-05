@@ -19,10 +19,14 @@ from queue import Queue, Empty
 import time
 from json_utils import safe_json_dumps
 from monitor_manager import MonitorManager
+from session_manager import SessionManager
 
 # Создаем Flask приложение
 app = Flask(__name__)
 app.secret_key = 'telegram_parser_secret_key_2024'  # Для flash сообщений
+
+# Инициализируем менеджер сессий
+session_manager = SessionManager()
 
 # Отключаем кеширование для разработки
 @app.after_request
@@ -200,13 +204,19 @@ def index():
         
         # Получаем информацию о последней синхронизации
         sync_status = get_sync_status()
+        
+        # Получаем недавние и избранные чаты
+        recent_chats = session_manager.get_recent_chats(limit=6)
+        favorite_chats = session_manager.get_favorite_chats()
 
         return render_template('dashboard.html',
                              stats=stats,
                              total_chats=total_chats,
                              total_messages=total_messages,
                              changes_summary=changes_summary,
-                             sync_status=sync_status)
+                             sync_status=sync_status,
+                             recent_chats=recent_chats,
+                             favorite_chats=favorite_chats)
     except Exception as e:
         flash(f'Ошибка загрузки данных: {e}', 'error')
         return render_template('dashboard.html', stats=[], total_chats=0, total_messages=0, sync_status=None)
@@ -223,10 +233,26 @@ def chats():
         # Преобразуем данные к ожидаемому формату
         chats_data = [transform_chat_data(chat) for chat in raw_chats]
         
-        return render_template('chats.html', chats=chats_data)
+        # Получаем недавние и избранные чаты
+        recent_chats = session_manager.get_recent_chats(limit=10)
+        favorite_chats = session_manager.get_favorite_chats()
+        
+        # Создаем множества ID для быстрой проверки
+        recent_ids = {chat['id'] for chat in recent_chats}
+        favorite_ids = {chat['id'] for chat in favorite_chats}
+        
+        # Добавляем флаги к чатам
+        for chat in chats_data:
+            chat['is_recent'] = chat['id'] in recent_ids
+            chat['is_favorite'] = chat['id'] in favorite_ids
+            
+        return render_template('chats.html', 
+                             chats=chats_data,
+                             recent_chats=recent_chats,
+                             favorite_chats=favorite_chats)
     except Exception as e:
         flash(f'Ошибка загрузки чатов: {e}', 'error')
-        return render_template('chats.html', chats=[])
+        return render_template('chats.html', chats=[], recent_chats=[], favorite_chats=[])
 
 @app.route('/chat/<chat_id>')
 def chat_detail(chat_id):
@@ -246,6 +272,12 @@ def chat_detail(chat_id):
         if 'error' in report:
             flash(f"Чат не найден: {report['error']}", 'error')
             return redirect(url_for('chats'))
+            
+        # Добавляем чат в недавние
+        chat_info = report.get('chat_info', {})
+        chat_name = chat_info.get('name', f'Chat {chat_id}')
+        chat_type = chat_info.get('type', 'private')
+        session_manager.add_recent_chat(chat_id, chat_name, chat_type)
 
         # Анализ стартеров диалогов
         starters = analytics.analyze_conversation_starters(chat_id)
@@ -1418,6 +1450,47 @@ def clear_cache():
     """Очистка кэша"""
     # TODO: Реализовать очистку кэша
     return jsonify({'success': True, 'message': 'Кэш очищен'})
+
+@app.route('/api/recent-chat/remove/<int:chat_id>', methods=['POST'])
+def remove_recent_chat(chat_id):
+    """Удаляет чат из недавних"""
+    try:
+        session_manager.remove_recent_chat(chat_id)
+        return jsonify({'success': True, 'message': 'Чат удален из недавних'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/favorite-chat/toggle/<int:chat_id>', methods=['POST'])
+def toggle_favorite_chat(chat_id):
+    """Переключает статус избранного чата"""
+    try:
+        # Получаем информацию о чате
+        chat_stats = analytics.get_chat_statistics(chat_id)
+        if not chat_stats:
+            return jsonify({'success': False, 'error': 'Чат не найден'})
+            
+        chat_name = chat_stats.get('chat_name', f'Chat {chat_id}')
+        chat_type = chat_stats.get('chat_type', 'private')
+        
+        # Переключаем статус
+        is_favorite = session_manager.toggle_favorite_chat(chat_id, chat_name, chat_type)
+        
+        return jsonify({
+            'success': True, 
+            'is_favorite': is_favorite,
+            'message': 'Добавлен в избранное' if is_favorite else 'Удален из избранного'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/recent-chats/clear', methods=['POST'])
+def clear_recent_chats():
+    """Очищает список недавних чатов"""
+    try:
+        session_manager.clear_recent_chats()
+        return jsonify({'success': True, 'message': 'Недавние чаты очищены'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     print("🌐 Запуск веб-интерфейса Telegram Parser...")

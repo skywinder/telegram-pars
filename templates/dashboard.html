@@ -162,51 +162,115 @@
 </div>
 {% endif %}
 
+<!-- Недавние чаты -->
+{% if recent_chats %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-primary">
+            <div class="card-header bg-primary bg-opacity-10 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history"></i> Недавние чаты
+                </h5>
+                <a href="{{ url_for('chats') }}" class="btn btn-sm btn-outline-primary">
+                    Все чаты <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for chat in recent_chats[:6] %}
+                    <div class="col-md-4 col-sm-6 mb-3">
+                        <a href="{{ url_for('chat_detail', chat_id=chat.id) }}" class="text-decoration-none">
+                            <div class="card h-100 recent-chat-card">
+                                <div class="card-body">
+                                    <h6 class="card-title text-truncate">
+                                        {% if chat.type == 'User' %}
+                                            <i class="bi bi-person-circle text-success"></i>
+                                        {% elif chat.type == 'Chat' %}
+                                            <i class="bi bi-people-fill text-info"></i>
+                                        {% else %}
+                                            <i class="bi bi-broadcast text-warning"></i>
+                                        {% endif %}
+                                        {{ chat.name[:30] }}{% if chat.name|length > 30 %}...{% endif %}
+                                    </h6>
+                                    <small class="text-muted d-block">
+                                        <i class="bi bi-eye"></i> {{ chat.visit_count }} просмотров
+                                    </small>
+                                    <small class="text-muted">
+                                        <i class="bi bi-clock"></i> {{ chat.last_visited[:16] }}
+                                    </small>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Мониторинг статуса -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card border-info">
             <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
-                    <i class="bi bi-activity"></i> Мониторинг Статуса Парсинга
+                    <i class="bi bi-activity"></i> Мониторинг и Управление
                 </h5>
-                <a href="{{ url_for('status_page') }}" class="btn btn-sm btn-light">
-                    Подробный статус <i class="bi bi-arrow-right"></i>
-                </a>
+                <div id="currentSyncStatus" class="text-white small">
+                    <span class="spinner-border spinner-border-sm me-1" style="display: none;"></span>
+                    <span id="syncStatusText">Загрузка статуса...</span>
+                </div>
             </div>
             <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6 class="text-info">📊 Real-time Мониторинг</h6>
-                        <p class="mb-2">Отслеживайте прогресс парсинга в реальном времени</p>
-                        <ul class="list-unstyled small">
-                            <li><i class="bi bi-check2 text-success"></i> Текущий статус операций</li>
-                            <li><i class="bi bi-check2 text-success"></i> Прогресс обработки чатов</li>
-                            <li><i class="bi bi-check2 text-success"></i> Статистика API запросов</li>
-                            <li><i class="bi bi-check2 text-success"></i> Расчет времени завершения</li>
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <h6 class="text-info">🔍 Мониторинг Изменений</h6>
-                        <p class="mb-2">Отслеживание изменений сообщений в реальном времени</p>
-                        <ul class="list-unstyled small">
-                            <li><i class="bi bi-check2 text-success"></i> Редактирование сообщений</li>
-                            <li><i class="bi bi-check2 text-success"></i> Удаление сообщений</li>
-                            <li><i class="bi bi-check2 text-success"></i> История изменений</li>
-                            <li><i class="bi bi-check2 text-success"></i> Уведомления в реальном времени</li>
-                        </ul>
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div id="activeProcessInfo" class="alert alert-info mb-3" style="display: none;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    <strong>Активный процесс:</strong> <span id="activeProcessName">-</span>
+                                    <br>
+                                    <small>Текущий чат: <span id="currentChatName">-</span></small>
+                                </div>
+                                <div>
+                                    <span id="processProgress">-</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="text-center mt-3">
-                    <div class="btn-group" role="group">
-                        <a href="{{ url_for('status_page') }}" class="btn btn-info">
-                            <i class="bi bi-eye"></i> Открыть Мониторинг
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-info">📊 Статус Парсинга</h6>
+                        <p class="mb-2">Просматривайте текущий прогресс синхронизации в реальном времени</p>
+                        <a href="{{ url_for('status_page') }}" class="btn btn-sm btn-info">
+                            <i class="bi bi-eye"></i> Открыть статус парсинга
                         </a>
-                        <button type="button" class="btn btn-outline-info" onclick="openStatusMonitor()">
-                            <i class="bi bi-terminal"></i> CLI Мониторинг
+                        <p class="mt-2 mb-0"><small class="text-muted">Показывает какой чат сейчас обрабатывается и прогресс</small></p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-warning">🔍 Мониторинг Изменений</h6>
+                        <p class="mb-2">Отслеживайте изменения сообщений в реальном времени</p>
+                        <a href="{{ url_for('realtime_monitor_page') }}" class="btn btn-sm btn-warning">
+                            <i class="bi bi-broadcast"></i> Запустить мониторинг
+                        </a>
+                        <p class="mt-2 mb-0"><small class="text-muted">Следит за редактированием и удалением сообщений</small></p>
+                    </div>
+                </div>
+                <hr>
+                <div class="text-center">
+                    <h6 class="text-muted mb-3">Управление процессами</h6>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-success" onclick="startQuickParsing('check_changes')">
+                            <i class="bi bi-arrow-clockwise"></i> Проверить изменения
                         </button>
-                        <a href="{{ url_for('realtime_monitor_page') }}" class="btn btn-warning">
-                            <i class="bi bi-broadcast"></i> Мониторинг изменений
+                        <button class="btn btn-primary" onclick="startQuickParsing('all')">
+                            <i class="bi bi-download"></i> Полная синхронизация
+                        </button>
+                        <a href="{{ url_for('control_panel') }}" class="btn btn-secondary">
+                            <i class="bi bi-gear"></i> Панель управления
                         </a>
                     </div>
                 </div>
@@ -376,8 +440,79 @@
 {% endif %}
 {% endblock %}
 
+{% block styles %}
+<style>
+.recent-chat-card {
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0,0,0,0.125);
+}
+.recent-chat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+    border-color: #0d6efd;
+}
+</style>
+{% endblock %}
+
 {% block scripts %}
 <script>
+// Проверка статуса синхронизации
+async function checkSyncStatus() {
+    try {
+        const response = await fetch('/api/status');
+        const data = await response.json();
+        
+        const statusText = document.getElementById('syncStatusText');
+        const spinner = document.querySelector('#currentSyncStatus .spinner-border');
+        const processInfo = document.getElementById('activeProcessInfo');
+        
+        if (data.status === 'success' && data.data && data.data.is_active) {
+            // Есть активный процесс
+            spinner.style.display = 'inline-block';
+            statusText.textContent = 'Синхронизация активна';
+            
+            // Показываем информацию о процессе
+            processInfo.style.display = 'block';
+            document.getElementById('activeProcessName').textContent = data.data.current_operation || 'Неизвестная операция';
+            
+            if (data.data.current_chat) {
+                document.getElementById('currentChatName').textContent = data.data.current_chat.name || 'Неизвестный чат';
+            } else {
+                document.getElementById('currentChatName').textContent = '-';
+            }
+            
+            if (data.data.progress) {
+                const progress = data.data.progress;
+                let progressText = '';
+                
+                if (progress.total_chats > 0) {
+                    const percentage = (progress.processed_chats / progress.total_chats * 100).toFixed(1);
+                    progressText = `Чаты: ${progress.processed_chats}/${progress.total_chats} (${percentage}%)`;
+                }
+                
+                if (progress.current_chat_messages_processed !== undefined) {
+                    if (progressText) progressText += ' | ';
+                    progressText += `Сообщения: ${progress.current_chat_messages_processed}`;
+                }
+                
+                document.getElementById('processProgress').textContent = progressText || 'Обработка...';
+            }
+        } else {
+            // Нет активных процессов
+            spinner.style.display = 'none';
+            statusText.textContent = 'Нет активных процессов';
+            processInfo.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error checking sync status:', error);
+        document.getElementById('syncStatusText').textContent = 'Ошибка проверки статуса';
+    }
+}
+
+// Проверяем статус при загрузке и каждые 5 секунд
+checkSyncStatus();
+setInterval(checkSyncStatus, 5000);
+
 // Функция для быстрого запуска парсинга
 async function startQuickParsing(type) {
     const button = event.target;
