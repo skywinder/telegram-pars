@@ -303,7 +303,11 @@ def chat_detail(chat_id):
                              sync_status=chat_sync_status,
                              monitor_status=monitor_status)
     except Exception as e:
-        flash(f'Ошибка загрузки чата: {e}', 'error')
+        import traceback
+        error_msg = f'Ошибка загрузки чата: {str(e)}'
+        print(f"ERROR in chat_detail: {error_msg}")
+        print(traceback.format_exc())
+        flash(error_msg, 'error')
         return redirect(url_for('chats'))
 
 @app.route('/analytics')
@@ -1234,29 +1238,33 @@ def realtime_monitor_page():
 @app.route('/api/monitor/status')
 def api_monitor_status():
     """API для получения статуса мониторинга"""
-    # Получаем статус из файла (работает между процессами)
-    status = MonitorManager.get_status()
-    
-    # Также проверяем локальный экземпляр если есть
-    monitor = get_monitor_instance()
-    local_active = monitor is not None and monitor.is_running if monitor else False
-    
-    # Используем статус из файла как основной
-    is_active = status.get('is_active', False) or local_active
-    
-    if not is_active and not monitor:
+    try:
+        # Получаем статус из файла (работает между процессами)
+        status = MonitorManager.get_status()
+        
+        # Проверяем глобальный monitor_manager
+        global monitor_manager
+        local_active = False
+        if 'monitor_manager' in globals() and monitor_manager:
+            local_active = monitor_manager.is_active()
+        
+        # Используем статус из файла как основной
+        is_active = status.get('is_active', False) or local_active
+        
+        return jsonify({
+            'is_active': is_active,
+            'message': 'Мониторинг активен' if is_active else 'Мониторинг неактивен',
+            'stats': status.get('stats', {}),
+            'mode': status.get('mode', 'unknown'),
+            'start_time': status.get('start_time', '')
+        })
+    except Exception as e:
+        print(f"Error getting monitor status: {e}")
         return jsonify({
             'is_active': False,
-            'message': 'Монитор не инициализирован',
-            'stats': status.get('stats', {})
+            'message': 'Ошибка получения статуса',
+            'error': str(e)
         })
-    
-    return jsonify({
-        'is_active': is_active,
-        'monitored_chats': len(monitor.monitored_chats) if monitor and monitor.monitored_chats else status.get('mode', 'all'),
-        'stats': status.get('stats', {}),
-        'last_updated': status.get('last_updated')
-    })
 
 @app.route('/api/monitor/recent-changes')
 def api_monitor_recent_changes():
@@ -1375,27 +1383,37 @@ def stop_parser():
 @app.route('/api/monitor/start', methods=['POST'])
 def start_monitor():
     """Запуск мониторинга"""
-    data = request.get_json()
-    mode = data.get('mode', 'all')
-    chat_ids = data.get('chat_ids', [])
-    
-    monitor = get_monitor_instance()
-    if monitor:
-        # Запускаем мониторинг
-        asyncio.run(monitor.start_monitoring(chat_ids if mode == 'selected' else None))
+    try:
+        data = request.get_json() or {}
+        mode = data.get('mode', 'all')
+        chat_ids = data.get('chat_ids', [])
+        
+        # Используем MonitorManager вместо get_monitor_instance
+        global monitor_manager
+        if 'monitor_manager' not in globals():
+            monitor_manager = MonitorManager()
+            
+        # Запускаем мониторинг в отдельном потоке
+        monitor_manager.start(mode=mode, chat_ids=chat_ids if mode == 'selected' else None)
+        
         return jsonify({'success': True, 'message': 'Мониторинг запущен'})
-    else:
-        return jsonify({'success': False, 'error': 'Монитор не инициализирован'}), 500
+    except Exception as e:
+        print(f"Error starting monitor: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/monitor/stop', methods=['POST'])
 def stop_monitor():
     """Остановка мониторинга"""
-    monitor = get_monitor_instance()
-    if monitor:
-        monitor.stop_monitoring()
-        return jsonify({'success': True, 'message': 'Мониторинг остановлен'})
-    else:
-        return jsonify({'success': False, 'error': 'Монитор не инициализирован'}), 500
+    try:
+        global monitor_manager
+        if 'monitor_manager' in globals() and monitor_manager:
+            monitor_manager.stop()
+            return jsonify({'success': True, 'message': 'Мониторинг остановлен'})
+        else:
+            return jsonify({'success': False, 'error': 'Монитор не запущен'}), 400
+    except Exception as e:
+        print(f"Error stopping monitor: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/monitor/configure', methods=['POST'])
 def configure_monitor():

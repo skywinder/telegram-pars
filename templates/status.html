@@ -1,472 +1,403 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Статус Парсинга - Telegram Parser</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        .status-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+{% extends "base.html" %}
 
-        .status-card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 20px 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
+{% block title %}Статус Парсинга - Telegram Parser{% endblock %}
 
-        .status-active { border-left: 5px solid #28a745; }
-        .status-inactive { border-left: 5px solid #6c757d; }
-        .status-error { border-left: 5px solid #dc3545; }
-        .status-interrupted { border-left: 5px solid #ffc107; }
+{% block styles %}
+<style>
+    .status-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
 
-        .progress-bar {
-            width: 100%;
-            height: 20px;
-            background-color: #e9ecef;
-            border-radius: 10px;
-            overflow: hidden;
-            margin: 10px 0;
-        }
+    .status-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 20px 0;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
 
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #007bff, #28a745);
-            transition: width 0.3s ease;
-            border-radius: 10px;
-        }
+    .status-active { border-left: 5px solid #28a745; }
+    .status-inactive { border-left: 5px solid #6c757d; }
+    .status-error { border-left: 5px solid #dc3545; }
+    .status-interrupted { border-left: 5px solid #ffc107; }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
-        }
+    .progress {
+        height: 25px;
+        border-radius: 10px;
+        margin: 15px 0;
+    }
 
-        .stat-item {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
+    .progress-bar {
+        background: linear-gradient(90deg, #007bff, #28a745);
+        transition: width 0.3s ease;
+    }
 
-        .stat-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: #007bff;
-        }
+    .stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #007bff;
+    }
 
-        .stat-label {
-            font-size: 12px;
-            color: #666;
-            text-transform: uppercase;
-        }
+    .control-buttons {
+        margin: 20px 0;
+        text-align: center;
+    }
 
-        .control-buttons {
-            margin: 20px 0;
-            text-align: center;
-        }
+    .timeline-item {
+        border-left: 3px solid #007bff;
+        padding-left: 20px;
+        margin-left: 10px;
+        position: relative;
+        padding-bottom: 20px;
+    }
 
-        .btn {
-            padding: 10px 20px;
-            margin: 0 10px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
+    .timeline-item:before {
+        content: '';
+        position: absolute;
+        left: -8px;
+        top: 0;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: #007bff;
+    }
 
-        .btn-danger {
-            background-color: #dc3545;
-            color: white;
-        }
+    .log-item {
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 5px;
+        font-family: monospace;
+        font-size: 14px;
+    }
 
-        .btn-danger:hover {
-            background-color: #c82333;
-        }
+    .log-success { background: #d4edda; color: #155724; }
+    .log-warning { background: #fff3cd; color: #856404; }
+    .log-error { background: #f8d7da; color: #721c24; }
+    .log-info { background: #d1ecf1; color: #0c5460; }
+</style>
+{% endblock %}
 
-        .btn-secondary {
-            background-color: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background-color: #545b62;
-        }
-
-        .auto-refresh {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #007bff;
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 12px;
-        }
-
-        .no-parser {
-            text-align: center;
-            padding: 40px;
-            color: #666;
-        }
-
-        .current-chat {
-            background: #e3f2fd;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-        }
-
-        .timestamp {
-            font-size: 12px;
-            color: #666;
-            text-align: right;
-        }
-
-        .error-message {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-        }
-
-        .alert {
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 5px;
-        }
-
-        .alert-warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
-        }
-    </style>
-</head>
-<body>
-    <div class="status-container">
-        <h1>📊 Статус Парсинга Telegram</h1>
-
-        <div class="auto-refresh" id="autoRefresh">
-            🔄 Обновление через <span id="countdown">5</span>с
-        </div>
-
-        <div id="statusContent">
-            <!-- Контент будет загружен через JavaScript -->
-        </div>
-
-        <div class="control-buttons">
-            <button class="btn btn-danger" onclick="requestInterrupt()" id="interruptBtn">
-                🛑 Прервать Операцию
-            </button>
-            <button class="btn btn-secondary" onclick="toggleAutoRefresh()" id="refreshBtn">
-                ⏸️ Пауза Обновлений
-            </button>
+{% block content %}
+<div class="status-container">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="bi bi-activity"></i> Статус системы
+            </h1>
         </div>
     </div>
 
-    <script>
-        let autoRefreshEnabled = true;
-        let refreshInterval = null;
-        let countdownInterval = null;
-        let countdownSeconds = 5;
-
-        // Запуск автообновления
-        function startAutoRefresh() {
-            refreshInterval = setInterval(loadStatus, 5000);
-            startCountdown();
-        }
-
-        // Остановка автообновления
-        function stopAutoRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-                refreshInterval = null;
-            }
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
-                countdownInterval = null;
-            }
-        }
-
-        // Обратный отсчет
-        function startCountdown() {
-            countdownSeconds = 5;
-            countdownInterval = setInterval(() => {
-                countdownSeconds--;
-                document.getElementById('countdown').textContent = countdownSeconds;
-                if (countdownSeconds <= 0) {
-                    countdownSeconds = 5;
-                }
-            }, 1000);
-        }
-
-        // Переключение автообновления
-        function toggleAutoRefresh() {
-            autoRefreshEnabled = !autoRefreshEnabled;
-            const btn = document.getElementById('refreshBtn');
-
-            if (autoRefreshEnabled) {
-                startAutoRefresh();
-                btn.textContent = '⏸️ Пауза Обновлений';
-                document.getElementById('autoRefresh').style.display = 'block';
-            } else {
-                stopAutoRefresh();
-                btn.textContent = '▶️ Включить Обновления';
-                document.getElementById('autoRefresh').style.display = 'none';
-            }
-        }
-
-        // Загрузка статуса
-        async function loadStatus() {
-            try {
-                const response = await fetch('/api/status');
-                const data = await response.json();
-                displayStatus(data);
-            } catch (error) {
-                displayError('Ошибка соединения с сервером: ' + error.message);
-            }
-        }
-
-        // Отображение статуса
-        function displayStatus(data) {
-            const content = document.getElementById('statusContent');
-
-            if (data.status === 'no_active_parser') {
-                content.innerHTML = `
-                    <div class="status-card status-inactive">
-                        <div class="no-parser">
-                            <h2>😴 Нет Активных Операций</h2>
-                            <p>Парсер не запущен или не выполняет операции</p>
-                            <p>💡 Запустите <code>python main.py</code> для начала работы</p>
-                        </div>
-                    </div>
-                `;
-                return;
-            }
-
-            if (data.status !== 'success') {
-                displayError(data.message || 'Неизвестная ошибка');
-                return;
-            }
-
-            const statusData = data.data;
-            const isActive = statusData.is_active;
-            const isInterrupted = statusData.interruption_requested;
-
-            let statusClass = 'status-inactive';
-            let statusIcon = '🔴';
-            let statusText = 'Неактивен';
-
-            if (isInterrupted) {
-                statusClass = 'status-interrupted';
-                statusIcon = '🛑';
-                statusText = 'Прерывание Запрошено';
-            } else if (isActive) {
-                statusClass = 'status-active';
-                statusIcon = '🟢';
-                statusText = 'Активен';
-            }
-
-            let progressHtml = '';
-            if (statusData.progress) {
-                const progress = statusData.progress;
-                
-                // Прогресс по чатам
-                let chatProgressHtml = '';
-                if (progress.total_chats > 0) {
-                    const percentage = (progress.processed_chats / progress.total_chats * 100).toFixed(1);
-                    chatProgressHtml = `
-                        <p><strong>📁 Чаты:</strong> ${progress.processed_chats}/${progress.total_chats} (${percentage}%)</p>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${percentage}%"></div>
-                        </div>
-                    `;
-                }
-                
-                // Прогресс по сообщениям
-                let messageProgressHtml = '';
-                if (progress.current_chat_messages_processed !== undefined) {
-                    const msgTotal = progress.current_chat_messages;
-                    const msgProcessed = progress.current_chat_messages_processed;
-                    
-                    if (msgTotal && msgTotal !== 'all') {
-                        const msgPercentage = (msgProcessed / msgTotal * 100).toFixed(1);
-                        messageProgressHtml = `
-                            <p><strong>💬 Сообщения в текущем чате:</strong> ${msgProcessed}/${msgTotal} (${msgPercentage}%)</p>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: ${msgPercentage}%"></div>
-                            </div>
-                        `;
-                    } else {
-                        messageProgressHtml = `<p><strong>💬 Обработано сообщений:</strong> ${msgProcessed}</p>`;
-                    }
-                    
-                    if (progress.new_messages_found > 0) {
-                        messageProgressHtml += `<p><strong>✨ Найдено новых:</strong> ${progress.new_messages_found}</p>`;
-                    }
-                }
-                
-                // Фаза парсинга
-                let phaseHtml = '';
-                if (progress.parsing_phase) {
-                    phaseHtml = `<p><strong>📋 Фаза:</strong> ${progress.parsing_phase}</p>`;
-                }
-
-                progressHtml = `
-                    <div class="current-chat">
-                        <h3>📊 Прогресс Операции</h3>
-                        ${phaseHtml}
-                        ${chatProgressHtml}
-                        ${messageProgressHtml}
-                        ${progress.estimated_time_remaining ?
-                            `<p><strong>⏰ Осталось:</strong> ${progress.estimated_time_remaining}</p>` :
-                            ''
-                        }
-                    </div>
-                `;
-            }
-
-            let currentChatHtml = '';
-            if (statusData.current_chat) {
-                const chat = statusData.current_chat;
-                currentChatHtml = `
-                    <div class="current-chat">
-                        <h3>💬 Текущий Чат</h3>
-                        <p><strong>Название:</strong> ${chat.name}</p>
-                        <p><strong>Тип:</strong> ${chat.type}</p>
-                        <p><strong>ID:</strong> ${chat.id}</p>
-                    </div>
-                `;
-            }
-
-            let statsHtml = '';
-            if (statusData.session_statistics) {
-                const stats = statusData.session_statistics;
-                
-                // Вычисляем дополнительную статистику
-                const duration = stats.duration_seconds || 0;
-                const messagesPerMinute = stats.messages_saved && duration > 0 ? 
-                    (stats.messages_saved / duration * 60).toFixed(0) : 0;
-                
-                statsHtml = `
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <div class="stat-number">${stats.total_requests || 0}</div>
-                            <div class="stat-label">Всего Запросов</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number">${stats.messages_saved || 0}</div>
-                            <div class="stat-label">Сохранено Сообщений</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number">${stats.flood_waits || 0}</div>
-                            <div class="stat-label">FloodWait Ошибок</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number">${stats.errors || 0}</div>
-                            <div class="stat-label">Других Ошибок</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number">${formatTime(duration)}</div>
-                            <div class="stat-label">Длительность</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number">${messagesPerMinute}</div>
-                            <div class="stat-label">Сообщений/Мин</div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            let alertHtml = '';
-            if (isInterrupted) {
-                alertHtml = `
-                    <div class="alert alert-warning">
-                        🛑 <strong>Прерывание запрошено!</strong> Операция завершится после обработки текущего чата.
-                    </div>
-                `;
-            }
-
-            content.innerHTML = `
-                <div class="status-card ${statusClass}">
-                    <h2>${statusIcon} Статус: ${statusText}</h2>
-                    <p><strong>Операция:</strong> ${statusData.current_operation || 'Неизвестно'}</p>
-                    <div class="timestamp">Последнее обновление: ${statusData.last_update || 'Не указано'}</div>
-
-                    ${alertHtml}
-                    ${currentChatHtml}
-                    ${progressHtml}
-
-                    <h3>📈 Статистика Сессии</h3>
-                    ${statsHtml}
-                </div>
-            `;
-
-            // Управление кнопкой прерывания
-            const interruptBtn = document.getElementById('interruptBtn');
-            interruptBtn.disabled = !isActive || isInterrupted;
-            interruptBtn.textContent = isInterrupted ? '🛑 Прерывание Запрошено' : '🛑 Прервать Операцию';
-        }
-
-        // Отображение ошибки
-        function displayError(message) {
-            const content = document.getElementById('statusContent');
-            content.innerHTML = `
-                <div class="status-card status-error">
-                    <div class="error-message">
-                        ❌ <strong>Ошибка:</strong> ${message}
+    <!-- Основной статус -->
+    <div class="row">
+        <div class="col-12">
+            <div class="status-card" id="main-status">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>Состояние парсера</h3>
+                    <div id="status-badge">
+                        <span class="badge bg-secondary fs-6">
+                            <i class="bi bi-circle"></i> Загрузка...
+                        </span>
                     </div>
                 </div>
-            `;
-        }
+                
+                <div id="current-task" style="display: none;">
+                    <h5 class="text-muted">Текущая задача:</h5>
+                    <p class="fs-5" id="task-description">-</p>
+                    
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" 
+                             style="width: 0%"
+                             id="progress-bar">
+                            0%
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between text-muted small">
+                        <span>Обработано: <strong id="processed-count">0</strong></span>
+                        <span>Всего: <strong id="total-count">0</strong></span>
+                        <span>Время: <strong id="elapsed-time">00:00</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        // Запрос прерывания
-        async function requestInterrupt() {
-            if (!confirm('Вы уверены, что хотите прервать операцию?')) {
-                return;
+    <!-- Статистика -->
+    <div class="row mt-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="stat-number" id="total-chats">0</div>
+                    <div class="text-muted">Чатов обработано</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="stat-number" id="total-messages">0</div>
+                    <div class="text-muted">Сообщений загружено</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="stat-number" id="new-messages">0</div>
+                    <div class="text-muted">Новых сообщений</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="stat-number" id="api-calls">0</div>
+                    <div class="text-muted">API запросов</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Управление -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h4>Управление</h4>
+                    <div class="control-buttons">
+                        <button class="btn btn-danger" onclick="requestStop()" id="stop-btn" style="display: none;">
+                            <i class="bi bi-stop-circle"></i> Остановить парсинг
+                        </button>
+                        <button class="btn btn-primary" onclick="startParsing()" id="start-btn">
+                            <i class="bi bi-play-circle"></i> Запустить парсинг
+                        </button>
+                        <a href="{{ url_for('parsing_page') }}" class="btn btn-secondary">
+                            <i class="bi bi-gear"></i> Настройки парсинга
+                        </a>
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-house"></i> На главную
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Последние события -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h4>Последние события</h4>
+                    <div id="event-log" style="max-height: 300px; overflow-y: auto;">
+                        <div class="text-muted text-center py-3">
+                            <i class="bi bi-clock-history"></i> Ожидание событий...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Детали чатов -->
+    <div class="row mt-4" id="chat-details" style="display: none;">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h4>Обработанные чаты</h4>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Чат</th>
+                                    <th>Тип</th>
+                                    <th>Сообщений</th>
+                                    <th>Новых</th>
+                                    <th>Время</th>
+                                    <th>Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody id="chat-list">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let updateInterval = null;
+let startTime = null;
+
+// Обновление статуса
+async function updateStatus() {
+    try {
+        const response = await fetch('/api/status/current');
+        const data = await response.json();
+        
+        updateUI(data);
+        
+        if (data.status === 'parsing' || data.status === 'initializing') {
+            if (!updateInterval) {
+                updateInterval = setInterval(updateStatus, 1000);
             }
-
-            try {
-                const response = await fetch('/api/status/interrupt', {
-                    method: 'POST'
-                });
-                const data = await response.json();
-
-                if (data.status === 'success') {
-                    alert('✅ Запрос на прерывание отправлен успешно!');
-                } else {
-                    alert('❌ Ошибка: ' + data.message);
-                }
-            } catch (error) {
-                alert('❌ Ошибка соединения: ' + error.message);
+        } else {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
             }
         }
+    } catch (error) {
+        console.error('Error updating status:', error);
+    }
+}
 
-        // Форматирование времени
-        function formatTime(seconds) {
-            if (seconds < 60) {
-                return seconds.toFixed(0) + 'с';
-            } else if (seconds < 3600) {
-                return (seconds / 60).toFixed(1) + 'м';
-            } else {
-                return (seconds / 3600).toFixed(1) + 'ч';
+// Обновление интерфейса
+function updateUI(data) {
+    // Статус бейдж
+    const statusBadge = document.getElementById('status-badge');
+    const statusHtml = {
+        'idle': '<span class="badge bg-secondary fs-6"><i class="bi bi-circle"></i> Неактивен</span>',
+        'initializing': '<span class="badge bg-info fs-6"><i class="bi bi-hourglass-split"></i> Инициализация...</span>',
+        'parsing': '<span class="badge bg-success fs-6"><i class="bi bi-circle-fill"></i> Парсинг...</span>',
+        'interrupted': '<span class="badge bg-warning fs-6"><i class="bi bi-exclamation-circle"></i> Прерван</span>',
+        'error': '<span class="badge bg-danger fs-6"><i class="bi bi-x-circle"></i> Ошибка</span>'
+    };
+    statusBadge.innerHTML = statusHtml[data.status] || statusHtml['idle'];
+    
+    // Кнопки управления
+    const stopBtn = document.getElementById('stop-btn');
+    const startBtn = document.getElementById('start-btn');
+    
+    if (data.status === 'parsing' || data.status === 'initializing') {
+        stopBtn.style.display = 'inline-block';
+        startBtn.style.display = 'none';
+        document.getElementById('current-task').style.display = 'block';
+    } else {
+        stopBtn.style.display = 'none';
+        startBtn.style.display = 'inline-block';
+        document.getElementById('current-task').style.display = 'none';
+    }
+    
+    // Текущая задача
+    if (data.current_chat) {
+        document.getElementById('task-description').textContent = `Обработка: ${data.current_chat}`;
+    }
+    
+    // Прогресс
+    if (data.total_chats > 0) {
+        const progress = (data.processed_chats / data.total_chats) * 100;
+        const progressBar = document.getElementById('progress-bar');
+        progressBar.style.width = progress + '%';
+        progressBar.textContent = Math.round(progress) + '%';
+        
+        document.getElementById('processed-count').textContent = data.processed_chats;
+        document.getElementById('total-count').textContent = data.total_chats;
+    }
+    
+    // Статистика
+    document.getElementById('total-chats').textContent = data.processed_chats || 0;
+    document.getElementById('total-messages').textContent = data.total_messages || 0;
+    document.getElementById('new-messages').textContent = data.new_messages || 0;
+    document.getElementById('api-calls').textContent = data.api_calls || 0;
+    
+    // Время
+    if (data.status === 'parsing' && !startTime && data.start_time) {
+        startTime = new Date(data.start_time);
+    }
+    
+    if (startTime) {
+        const elapsed = Math.floor((new Date() - startTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        document.getElementById('elapsed-time').textContent = 
+            `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    // События
+    if (data.recent_events && data.recent_events.length > 0) {
+        updateEventLog(data.recent_events);
+    }
+}
+
+// Обновление лога событий
+function updateEventLog(events) {
+    const logContainer = document.getElementById('event-log');
+    
+    if (events.length === 0) {
+        return;
+    }
+    
+    let html = '';
+    events.forEach(event => {
+        const typeClass = {
+            'info': 'log-info',
+            'success': 'log-success',
+            'warning': 'log-warning',
+            'error': 'log-error'
+        }[event.type] || 'log-info';
+        
+        html += `
+            <div class="log-item ${typeClass}">
+                <i class="bi bi-${getIconForType(event.type)}"></i>
+                <strong>${event.timestamp}</strong> - ${event.message}
+            </div>
+        `;
+    });
+    
+    logContainer.innerHTML = html;
+}
+
+function getIconForType(type) {
+    const icons = {
+        'info': 'info-circle',
+        'success': 'check-circle',
+        'warning': 'exclamation-triangle',
+        'error': 'x-circle'
+    };
+    return icons[type] || 'circle';
+}
+
+// Остановка парсинга
+async function requestStop() {
+    if (confirm('Вы уверены, что хотите остановить парсинг?')) {
+        try {
+            const response = await fetch('/api/parser/stop', {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('Запрос на остановку отправлен');
             }
+        } catch (error) {
+            console.error('Error stopping parser:', error);
+            alert('Ошибка при остановке парсера');
         }
+    }
+}
 
-        // Инициализация при загрузке страницы
-        document.addEventListener('DOMContentLoaded', function() {
-            loadStatus();
-            startAutoRefresh();
-        });
-    </script>
-</body>
-</html>
+// Запуск парсинга
+function startParsing() {
+    window.location.href = '/parsing';
+}
+
+// Инициализация
+document.addEventListener('DOMContentLoaded', function() {
+    updateStatus();
+    
+    // Обновляем каждые 5 секунд когда неактивен
+    setInterval(function() {
+        if (!updateInterval) {
+            updateStatus();
+        }
+    }, 5000);
+});
+</script>
+{% endblock %}

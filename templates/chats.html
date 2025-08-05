@@ -20,6 +20,26 @@
 
 <!-- Фильтры -->
 <div class="row mb-4">
+    <div class="col-12">
+        <!-- Quick Filter Buttons -->
+        <div class="btn-group mb-3" role="group" aria-label="Chat type filter">
+            <button type="button" class="btn btn-outline-primary active" onclick="filterChatsByType('')">
+                <i class="bi bi-chat-dots"></i> Все чаты
+            </button>
+            <button type="button" class="btn btn-outline-success" onclick="filterChatsByType('User')">
+                <i class="bi bi-person"></i> Личные
+            </button>
+            <button type="button" class="btn btn-outline-info" onclick="filterChatsByType('Chat')">
+                <i class="bi bi-people"></i> Группы
+            </button>
+            <button type="button" class="btn btn-outline-warning" onclick="filterChatsByType('Channel')">
+                <i class="bi bi-broadcast"></i> Каналы
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
     <div class="col-md-6">
         <div class="input-group">
             <span class="input-group-text">
@@ -29,7 +49,7 @@
         </div>
     </div>
     <div class="col-md-3">
-        <select class="form-select" id="typeFilter">
+        <select class="form-select" id="typeFilter" style="display: none;">
             <option value="">Все типы</option>
             <option value="User">Личные чаты</option>
             <option value="Chat">Группы</option>
@@ -347,6 +367,19 @@
 
 {% block scripts %}
 <script>
+// Quick filter by type
+function filterChatsByType(type) {
+    // Update button states
+    document.querySelectorAll('.btn-group button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Set the filter and apply
+    document.getElementById('typeFilter').value = type;
+    filterChats();
+}
+
 // Фильтрация чатов
 document.getElementById('chatFilter').addEventListener('input', filterChats);
 document.getElementById('typeFilter').addEventListener('change', filterChats);
