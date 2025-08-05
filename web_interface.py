@@ -874,14 +874,15 @@ def api_start_parsing():
         options = data.get('options', {})
         
         # Формируем команду для запуска
-        cmd = ['python', 'main.py']
+        cmd = ['python', 'parser_runner.py', '--auto']
         
         # Добавляем параметры в зависимости от типа
         if parsing_type == 'single' and chat_id:
-            # Для одного чата нужно будет модифицировать main.py
-            cmd.extend(['--chat', str(chat_id)])
+            cmd.extend(['--chats', str(chat_id)])
         elif parsing_type == 'check_changes':
             cmd.extend(['--check-changes'])
+            if options.get('check_changes_hours'):
+                cmd.extend(['--hours', str(options['check_changes_hours'])])
         elif parsing_type == 'all':
             cmd.extend(['--all'])
             
@@ -1123,7 +1124,7 @@ def start_parser():
     
     def run_parser():
         try:
-            subprocess.run(['python', 'main.py', '--auto', '--all'], 
+            subprocess.run(['python', 'parser_runner.py', '--auto', '--all'], 
                          capture_output=True, text=True)
         except Exception as e:
             print(f"Error running parser: {e}")
@@ -1183,14 +1184,14 @@ def start_parsing():
     limit = data.get('limit', 0)
     
     # Формируем команду
-    cmd = ['python', 'main.py', '--auto']
+    cmd = ['python', 'parser_runner.py', '--auto']
     
     if parsing_type == 'all':
         cmd.append('--all')
     elif parsing_type == 'check_changes':
         cmd.append('--check-changes')
     elif parsing_type == 'selected' and chat_ids:
-        cmd.extend(['--chats'] + chat_ids)
+        cmd.extend(['--chats'] + [str(id) for id in chat_ids])
     
     if force_full_scan:
         cmd.append('--force-full-scan')
