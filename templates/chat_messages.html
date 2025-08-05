@@ -67,8 +67,8 @@
         {% if messages %}
             <div class="messages-container">
                 {% for message in messages %}
-                    <div class="card mb-3 {% if message.is_deleted %}border-danger opacity-75{% elif message.edit_count > 0 %}border-warning{% endif %}">
-                        <div class="card-header">
+                    <div class="card mb-3 {% if message.is_deleted %}border-danger bg-danger bg-opacity-10{% elif message.edit_count > 0 %}border-warning{% endif %}">
+                        <div class="card-header {% if message.is_deleted %}bg-danger bg-opacity-10{% endif %}">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <strong>
@@ -89,21 +89,39 @@
                                         {{ message.date }}
                                     </small>
                                     {% if message.edit_count > 0 %}
-                                        <span class="badge bg-warning ms-2" title="Изменено {{ message.edit_count }} раз">
+                                        <span class="badge bg-warning ms-2" title="Изменено {{ message.edit_count }} раз. Последнее: {{ message.last_edit }}">
                                             <i class="bi bi-pencil"></i> {{ message.edit_count }}
                                         </span>
                                     {% endif %}
                                     {% if message.is_deleted %}
-                                        <span class="badge bg-danger ms-2">
+                                        <span class="badge bg-danger ms-2" title="Удалено: {{ message.deletion_time or 'Неизвестно' }}">
                                             <i class="bi bi-trash"></i> Удалено
                                         </span>
                                     {% endif %}
                                 </div>
                             </div>
                         </div>
-                        <div class="card-body">
-                            {% if message.text %}
-                                <p class="mb-2 {% if message.is_deleted %}text-decoration-line-through{% endif %}">
+                        <div class="card-body {% if message.is_deleted %}bg-danger bg-opacity-5{% endif %}">
+                            {% if message.is_deleted and message.deletion_time %}
+                                <div class="alert alert-danger mb-3">
+                                    <i class="bi bi-exclamation-triangle-fill"></i>
+                                    <strong>Сообщение было удалено</strong>
+                                    <br>
+                                    <small>Время удаления: {{ message.deletion_time }}</small>
+                                    {% if message.deleted_text %}
+                                        <hr>
+                                        <strong>Удаленный текст:</strong>
+                                        <p class="mb-0 text-decoration-line-through">{{ message.deleted_text }}</p>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            
+                            {% if message.text and not message.is_deleted %}
+                                <p class="mb-2">
+                                    {{ message.text }}
+                                </p>
+                            {% elif message.text and message.is_deleted and not message.deleted_text %}
+                                <p class="mb-2 text-muted text-decoration-line-through">
                                     {{ message.text }}
                                 </p>
                             {% endif %}

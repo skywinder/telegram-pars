@@ -124,6 +124,59 @@ def get_sync_status():
         print(f"Ошибка получения статуса синхронизации: {e}")
         return None
 
+def get_chat_sync_status(chat_id):
+    """Получает информацию о последней синхронизации конкретного чата"""
+    if not db:
+        return None
+    
+    try:
+        with sqlite3.connect(db.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            # Получаем информацию о последнем обновлении чата
+            chat_info = conn.execute('''
+                SELECT 
+                    last_updated,
+                    total_messages
+                FROM chats
+                WHERE id = ?
+            ''', (chat_id,)).fetchone()
+            
+            # Получаем диапазон дат сообщений в чате
+            message_info = conn.execute('''
+                SELECT 
+                    MIN(date) as first_message,
+                    MAX(date) as last_message,
+                    COUNT(*) as total_messages,
+                    MAX(created_at) as last_sync
+                FROM messages
+                WHERE chat_id = ? AND is_deleted = FALSE
+            ''', (chat_id,)).fetchone()
+            
+            # Получаем количество изменений за последние 24 часа
+            recent_changes = conn.execute('''
+                SELECT COUNT(*) as count
+                FROM message_history
+                WHERE chat_id = ? 
+                AND timestamp > datetime('now', '-1 day')
+            ''', (chat_id,)).fetchone()
+            
+            if not chat_info:
+                return None
+                
+            return {
+                'last_updated': dict(chat_info)['last_updated'] if chat_info else None,
+                'first_message': dict(message_info)['first_message'] if message_info else None,
+                'last_message': dict(message_info)['last_message'] if message_info else None,
+                'last_sync': dict(message_info)['last_sync'] if message_info else None,
+                'total_messages': dict(message_info)['total_messages'] if message_info else 0,
+                'recent_changes': dict(recent_changes)['count'] if recent_changes else 0,
+                'is_parsing': StatusManager.get_status() is not None
+            }
+    except Exception as e:
+        print(f"Ошибка получения статуса синхронизации чата: {e}")
+        return None
+
 @app.route('/')
 def index():
     """Главная страница"""
@@ -658,7 +711,15 @@ def chat_messages(chat_id):
                      AND action_type = 'edited') as edit_count,
                     (SELECT MAX(timestamp) FROM message_history 
                      WHERE message_id = m.id AND chat_id = m.chat_id 
-                     AND action_type = 'edited') as last_edit
+                     AND action_type = 'edited') as last_edit,
+                    (SELECT timestamp FROM message_history 
+                     WHERE message_id = m.id AND chat_id = m.chat_id 
+                     AND action_type = 'deleted'
+                     ORDER BY timestamp DESC LIMIT 1) as deletion_time,
+                    (SELECT old_text FROM message_history 
+                     WHERE message_id = m.id AND chat_id = m.chat_id 
+                     AND action_type = 'deleted'
+                     ORDER BY timestamp DESC LIMIT 1) as deleted_text
                 FROM messages m
                 LEFT JOIN users u ON m.sender_id = u.id
                 WHERE m.chat_id = ?
