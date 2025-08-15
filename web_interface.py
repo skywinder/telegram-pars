@@ -67,17 +67,41 @@ def transform_chat_data(raw_chat):
     if not raw_chat:
         return None
     
-    return {
-        'id': raw_chat.get('chat_id', 0),
-        'name': raw_chat.get('chat_name', 'Неизвестный чат'),
-        'type': raw_chat.get('chat_type', 'unknown'),
-        'total_messages': raw_chat.get('message_count', 0),
-        'unique_senders': raw_chat.get('unique_users', 0),
-        'last_message': raw_chat.get('last_message', ''),
-        'active_days': raw_chat.get('active_days', 0),
-        'edited_count': raw_chat.get('edited_count', 0),
-        'deleted_count': raw_chat.get('deleted_count', 0)
-    }
+    # Handle both dict and sqlite3.Row objects
+    try:
+        # Try to access as dict first
+        if hasattr(raw_chat, 'get'):
+            return {
+                'id': raw_chat.get('chat_id', 0),
+                'name': raw_chat.get('chat_name', 'Неизвестный чат'),
+                'type': raw_chat.get('chat_type', 'unknown'),
+                'total_messages': raw_chat.get('message_count', 0),
+                'unique_senders': raw_chat.get('unique_users', 0),
+                'last_message': raw_chat.get('last_message', ''),
+                'active_days': raw_chat.get('active_days', 0),
+                'edited_count': raw_chat.get('edited_count', 0),
+                'deleted_count': raw_chat.get('deleted_count', 0)
+            }
+        # Handle sqlite3.Row objects
+        elif hasattr(raw_chat, 'keys'):
+            return {
+                'id': raw_chat['chat_id'] if 'chat_id' in raw_chat.keys() else 0,
+                'name': raw_chat['chat_name'] if 'chat_name' in raw_chat.keys() else 'Неизвестный чат',
+                'type': raw_chat['chat_type'] if 'chat_type' in raw_chat.keys() else 'unknown',
+                'total_messages': raw_chat['message_count'] if 'message_count' in raw_chat.keys() else 0,
+                'unique_senders': raw_chat['unique_users'] if 'unique_users' in raw_chat.keys() else 0,
+                'last_message': raw_chat['last_message'] if 'last_message' in raw_chat.keys() else '',
+                'active_days': raw_chat['active_days'] if 'active_days' in raw_chat.keys() else 0,
+                'edited_count': raw_chat['edited_count'] if 'edited_count' in raw_chat.keys() else 0,
+                'deleted_count': raw_chat['deleted_count'] if 'deleted_count' in raw_chat.keys() else 0
+            }
+        else:
+            # Log the error for debugging
+            print(f"WARNING: Unexpected data type in transform_chat_data: {type(raw_chat)}")
+            return None
+    except Exception as e:
+        print(f"ERROR in transform_chat_data: {e}, type: {type(raw_chat)}")
+        return None
 
 def get_sync_status():
     """Получает информацию о последней синхронизации"""
@@ -1333,7 +1357,8 @@ def control_panel():
     # Получаем номер телефона из конфига
     phone_number = os.getenv('PHONE_NUMBER', 'Не указан')
     
-    return render_template('control_panel.html',
+    # Use new template
+    return render_template('control_panel_new.html',
                          chats=chats,
                          db_size=db_size,
                          phone_number=phone_number)

@@ -22,19 +22,13 @@
                 <i class="bi bi-telegram"></i> Telegram Parser
             </a>
 
-            <!-- Stats indicators for desktop -->
+            <!-- Simplified stats for desktop -->
             <div class="d-none d-lg-flex align-items-center mx-3" id="navbar-stats">
                 <span class="badge bg-light text-dark me-2" title="Всего чатов">
                     <i class="bi bi-chat-dots"></i> <span id="nav-total-chats">-</span>
                 </span>
                 <span class="badge bg-light text-dark me-2" title="Всего сообщений">
                     <i class="bi bi-envelope"></i> <span id="nav-total-messages">-</span>
-                </span>
-                <span class="badge bg-light text-dark me-2" title="Изменений">
-                    <i class="bi bi-pencil"></i> <span id="nav-total-changes">-</span>
-                </span>
-                <span class="badge" id="nav-monitor-status" title="Статус мониторинга">
-                    <i class="bi bi-broadcast"></i> <span id="nav-monitor-text">-</span>
                 </span>
             </div>
 
@@ -46,22 +40,12 @@
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('index') }}">
-                            <i class="bi bi-speedometer2"></i> Дашборд
+                            <i class="bi bi-speedometer2"></i> Главная
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('chats') }}">
                             <i class="bi bi-chat-dots"></i> Чаты
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('parsing_page') }}">
-                            <i class="bi bi-arrow-clockwise"></i> Синхронизация
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('realtime_monitor_page') }}">
-                            <i class="bi bi-broadcast"></i> Мониторинг
                         </a>
                     </li>
                     <li class="nav-item dropdown">
@@ -70,43 +54,40 @@
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('analytics_page') }}">
-                                <i class="bi bi-bar-chart"></i> Общая статистика
+                                <i class="bi bi-bar-chart"></i> Статистика
                             </a></li>
                             <li><a class="dropdown-item" href="{{ url_for('message_changes') }}">
-                                <i class="bi bi-pencil-square"></i> Измененные сообщения
+                                <i class="bi bi-pencil-square"></i> Изменения
                             </a></li>
                             <li><a class="dropdown-item" href="{{ url_for('emoji_stats') }}">
-                                <i class="bi bi-emoji-smile"></i> Эмодзи статистика
-                            </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('conversation_starters') }}">
-                                <i class="bi bi-chat-left-text"></i> Инициаторы диалогов
-                            </a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-tools"></i> Инструменты
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('search_page') }}">
-                                <i class="bi bi-search"></i> Поиск сообщений
-                            </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('export_page') }}">
-                                <i class="bi bi-download"></i> Экспорт данных
-                            </a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('control_panel') }}">
-                                <i class="bi bi-sliders"></i> Панель управления
-                            </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('status_page') }}">
-                                <i class="bi bi-activity"></i> Системный статус
+                                <i class="bi bi-emoji-smile"></i> Эмодзи
                             </a></li>
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('help_page') }}">
-                            <i class="bi bi-question-circle"></i> Помощь
+                        <a class="nav-link" href="{{ url_for('control_panel') }}">
+                            <i class="bi bi-sliders"></i> Управление
                         </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i> Ещё
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('search_page') }}">
+                                <i class="bi bi-search"></i> Поиск
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('export_page') }}">
+                                <i class="bi bi-download"></i> Экспорт
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('conversation_starters') }}">
+                                <i class="bi bi-chat-left-text"></i> Диалоги
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('help_page') }}">
+                                <i class="bi bi-question-circle"></i> Помощь
+                            </a></li>
+                        </ul>
                     </li>
                 </ul>
 
