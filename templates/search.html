@@ -146,15 +146,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadChatsForFilter() {
     try {
-        // Здесь должен быть реальный API вызов для получения чатов
-        // Пока используем заглушку
+        const response = await fetch('/api/chats/list');
+        const data = await response.json();
+        
         const chatSelect = document.getElementById('searchChatId');
-        chatSelect.innerHTML = `
-            <option value="">Все чаты</option>
-            <option value="123">Личный чат с Петей</option>
-            <option value="456">Группа "Друзья"</option>
-            <option value="789">Канал "Новости"</option>
-        `;
+        chatSelect.innerHTML = '<option value="">Все чаты</option>';
+        
+        if (data.chats) {
+            data.chats.forEach(chat => {
+                const option = document.createElement('option');
+                option.value = chat.id;
+                option.textContent = chat.name;
+                chatSelect.appendChild(option);
+            });
+        }
     } catch (error) {
         console.error('Ошибка загрузки чатов:', error);
     }

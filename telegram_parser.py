@@ -275,6 +275,63 @@ class TelegramParser:
 
         print(f"📁 Найдено {len(chats)} чатов")
         return chats
+    
+    async def get_dialogs(self):
+        """Получает список диалогов (совместимость с parser_runner.py)"""
+        dialogs = []
+        async for dialog in self.client.iter_dialogs():
+            dialogs.append(dialog)
+        return dialogs
+    
+    async def parse_chat(self, dialog, limit=None, force_full_scan=False):
+        """Парсит один чат (совместимость с parser_runner.py)"""
+        chat_id = dialog.id
+        chat_name = dialog.name or f"Chat {chat_id}"
+        
+        print(f"\n{'='*50}")
+        print(f"📱 Парсим чат: {chat_name} (ID: {chat_id})")
+        print(f"{'='*50}")
+        
+        # Обновляем статус
+        self.update_status(
+            current_chat=chat_name,
+            current_operation=f'Парсинг чата: {chat_name}'
+        )
+        
+        # Создаем сессию если есть БД
+        session_id = self.db.create_scan_session() if self.db else None
+        
+        try:
+            # Парсим сообщения
+            messages = await self.parse_chat_messages(
+                chat_id=chat_id,
+                limit=limit,
+                session_id=session_id,
+                force_full_scan=force_full_scan
+            )
+            
+            # Обновляем прогресс
+            self.current_status['progress']['processed_chats'] += 1
+            
+            # Закрываем сессию с статистикой
+            if self.db and session_id:
+                stats = {
+                    'total_chats': 1,
+                    'total_messages': len(messages),
+                    'changes_detected': self.db.get_session_changes_count(session_id) if hasattr(self.db, 'get_session_changes_count') else 0
+                }
+                self.db.close_scan_session(session_id, stats)
+                
+            return messages
+            
+        except Exception as e:
+            print(f"❌ Ошибка при парсинге чата {chat_name}: {e}")
+            self.session_stats['errors'] += 1
+            return []
+    
+    async def disconnect(self):
+        """Отключение от Telegram (совместимость с parser_runner.py)"""
+        await self.close()
 
     async def parse_chat_messages(self, chat_id: int, limit: int = None, session_id: str = None, force_full_scan: bool = False) -> List[Dict]:
         """
@@ -300,11 +357,27 @@ class TelegramParser:
                 print(f"📦 Чат {chat_id} содержит {cached_count} кэшированных сообщений")
                 print(f"📅 Последнее сообщение: {last_message_date}")
 
-                # Парсим только новые сообщения с последней даты
+                # Всегда проверяем последние сообщения на изменения
+                # даже если есть кэш (минимум 50, максимум 200)
+                check_limit = min(200, max(50, int(cached_count * 0.1)))
+                print(f"🔍 Проверяем последние {check_limit} сообщений на изменения...")
+                
+                # Парсим последние сообщения для проверки изменений
+                recent_messages = await self._parse_all_messages(chat_id, check_limit, session_id)
+                
+                # Если есть новые сообщения после last_message_date, парсим их все
                 if last_message_date:
                     try:
                         last_date = datetime.fromisoformat(last_message_date.replace('Z', '+00:00'))
-                        return await self._parse_new_messages_since(chat_id, last_date, session_id)
+                        new_messages = await self._parse_new_messages_since(chat_id, last_date, session_id)
+                        
+                        # Объединяем результаты (убираем дубликаты по ID)
+                        message_ids = {msg['id'] for msg in recent_messages}
+                        for msg in new_messages:
+                            if msg['id'] not in message_ids:
+                                recent_messages.append(msg)
+                        
+                        return recent_messages
                     except ValueError:
                         print("⚠️ Ошибка парсинга даты, выполняем полное сканирование")
 

@@ -523,9 +523,8 @@ def api_search():
         with sqlite3.connect(db.db_path) as conn:
             conn.row_factory = sqlite3.Row
 
-            chat_filter = f"AND m.chat_id = {chat_id}" if chat_id else ""
-
-            results = conn.execute(f'''
+            # Базовый запрос с параметрами
+            sql_query = '''
                 SELECT
                     m.id, m.text, m.date, m.chat_id,
                     c.name as chat_name,
@@ -534,10 +533,20 @@ def api_search():
                 LEFT JOIN chats c ON m.chat_id = c.id
                 LEFT JOIN users u ON m.sender_id = u.id
                 WHERE m.text LIKE ?
-                AND m.is_deleted = FALSE {chat_filter}
-                ORDER BY m.date DESC
-                LIMIT ?
-            ''', (f'%{query}%', limit)).fetchall()
+                AND m.is_deleted = FALSE
+            '''
+            
+            params = [f'%{query}%']
+            
+            # Добавляем фильтр по чату если указан
+            if chat_id:
+                sql_query += ' AND m.chat_id = ?'
+                params.append(chat_id)
+            
+            sql_query += ' ORDER BY m.date DESC LIMIT ?'
+            params.append(limit)
+            
+            results = conn.execute(sql_query, params).fetchall()
 
             return jsonify({
                 'results': [dict(row) for row in results],
@@ -552,6 +561,27 @@ def api_search():
 def search_page():
     """Страница поиска"""
     return render_template('search.html')
+
+@app.route('/api/chats/list')
+def api_chats_list():
+    """API для получения списка чатов"""
+    if not db:
+        return jsonify({'error': 'База данных недоступна'}), 500
+    
+    try:
+        with sqlite3.connect(db.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            chats = conn.execute('''
+                SELECT id, name, type
+                FROM chats
+                ORDER BY name
+            ''').fetchall()
+            
+            return jsonify({
+                'chats': [dict(row) for row in chats]
+            })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/status')
 def status_page():
@@ -1372,12 +1402,65 @@ def help_page():
 def parser_status():
     """Получение статуса парсера"""
     status_data = StatusManager.get_status()
-    is_active = status_data is not None and status_data.get('status') == 'parsing'
+    is_active = status_data is not None and status_data.get('is_active', False)
+    
+    # Если парсер активен, проверяем PID файл
+    if is_active:
+        try:
+            if os.path.exists('parsing.pid'):
+                with open('parsing.pid', 'r') as f:
+                    pid = int(f.read().strip())
+                # Проверяем, жив ли процесс
+                try:
+                    os.kill(pid, 0)
+                except OSError:
+                    is_active = False
+                    StatusManager.clear_active_parser()
+        except:
+            pass
     
     return jsonify({
         'is_active': is_active,
-        'status': status_data
+        'status': status_data,
+        'details': {
+            'current_operation': status_data.get('current_operation', 'Неизвестно') if status_data else None,
+            'current_chat': status_data.get('current_chat', None) if status_data else None,
+            'progress': status_data.get('progress', {}) if status_data else {},
+            'last_update': status_data.get('last_update') if status_data else None
+        } if is_active else None
     })
+
+# Activity log queue for real-time updates
+activity_queue = Queue(maxsize=100)
+
+def add_activity_log(message, level='info'):
+    """Добавить сообщение в лог активности"""
+    try:
+        activity_queue.put_nowait({
+            'timestamp': datetime.now().isoformat(),
+            'message': message,
+            'level': level
+        })
+    except:
+        pass
+
+@app.route('/api/activity/stream')
+def activity_stream():
+    """SSE stream для activity log"""
+    def generate():
+        while True:
+            try:
+                # Получаем сообщение из очереди с таймаутом
+                activity = activity_queue.get(timeout=30)
+                yield f"data: {json.dumps(activity)}\n\n"
+            except Empty:
+                # Отправляем heartbeat каждые 30 секунд
+                yield f"data: {json.dumps({'heartbeat': True})}\n\n"
+            except Exception as e:
+                print(f"Error in activity stream: {e}")
+                break
+    
+    return Response(generate(), mimetype='text/event-stream')
 
 @app.route('/api/parser/start', methods=['POST'])
 def start_parser():
@@ -1385,12 +1468,76 @@ def start_parser():
     import subprocess
     import threading
     
+    # Получаем параметры из запроса
+    data = request.get_json() or {}
+    parse_type = data.get('type', 'all')
+    chat_ids = data.get('chat_ids', [])
+    force_full_scan = data.get('force_full_scan', False)
+    
     def run_parser():
+        # Логируем начало
+        add_activity_log(f"🚀 Запуск парсера: тип={parse_type}, force_scan={force_full_scan}", 'info')
+        
+        # Формируем команду
+        cmd = ['python', 'parser_runner.py', '--auto']
+        
+        if parse_type == 'all':
+            cmd.append('--all')
+            add_activity_log("📋 Режим: парсинг всех чатов", 'info')
+        elif parse_type == 'selected' and chat_ids:
+            cmd.extend(['--chats'] + [str(chat_id) for chat_id in chat_ids])
+            add_activity_log(f"📋 Режим: парсинг выбранных чатов ({len(chat_ids)} шт.)", 'info')
+        elif parse_type == 'changes':
+            cmd.append('--check-changes')
+            add_activity_log("🔍 Режим: проверка изменений", 'info')
+            
+        if force_full_scan:
+            cmd.append('--force-full-scan')
+            add_activity_log("⚠️ Принудительное полное сканирование", 'warning')
+        
         try:
-            subprocess.run(['python', 'parser_runner.py', '--auto', '--all'], 
-                         capture_output=True, text=True)
+            # Запускаем процесс
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+            
+            # Сохраняем PID
+            with open('parsing.pid', 'w') as f:
+                f.write(str(process.pid))
+            
+            add_activity_log(f"✅ Парсер запущен с PID: {process.pid}", 'success')
+            
+            # Читаем вывод в реальном времени
+            for line in iter(process.stdout.readline, ''):
+                if line.strip():
+                    # Определяем уровень по содержанию
+                    level = 'info'
+                    if '❌' in line or 'Ошибка' in line:
+                        level = 'error'
+                    elif '✅' in line or 'Успешно' in line:
+                        level = 'success'
+                    elif '⚠️' in line or 'Предупреждение' in line:
+                        level = 'warning'
+                    elif '🔍' in line or 'Проверка' in line:
+                        level = 'info'
+                    
+                    add_activity_log(line.strip(), level)
+            
+            # Ждем завершения
+            process.wait()
+            
+            if process.returncode == 0:
+                add_activity_log("✅ Парсер завершил работу успешно", 'success')
+            else:
+                add_activity_log(f"❌ Парсер завершился с ошибкой (код: {process.returncode})", 'error')
+                
         except Exception as e:
+            add_activity_log(f"❌ Ошибка запуска парсера: {e}", 'error')
             print(f"Error running parser: {e}")
+        finally:
+            # Очищаем PID файл
+            try:
+                os.remove('parsing.pid')
+            except:
+                pass
     
     # Запускаем в отдельном потоке
     thread = threading.Thread(target=run_parser)
@@ -1449,41 +1596,9 @@ def configure_monitor():
 
 @app.route('/api/parsing/start', methods=['POST'])
 def start_parsing():
-    """Запуск парсинга с параметрами"""
-    data = request.get_json()
-    parsing_type = data.get('type', 'all')
-    chat_ids = data.get('chat_ids', [])
-    force_full_scan = data.get('force_full_scan', False)
-    limit = data.get('limit', 0)
-    
-    # Формируем команду
-    cmd = ['python', 'parser_runner.py', '--auto']
-    
-    if parsing_type == 'all':
-        cmd.append('--all')
-    elif parsing_type == 'check_changes':
-        cmd.append('--check-changes')
-    elif parsing_type == 'selected' and chat_ids:
-        cmd.extend(['--chats'] + [str(id) for id in chat_ids])
-    
-    if force_full_scan:
-        cmd.append('--force-full-scan')
-    
-    if limit > 0:
-        cmd.extend(['--limit', str(limit)])
-    
-    # Запускаем в фоне
-    import subprocess
-    import threading
-    
-    def run():
-        subprocess.run(cmd, capture_output=True)
-    
-    thread = threading.Thread(target=run)
-    thread.daemon = True
-    thread.start()
-    
-    return jsonify({'success': True, 'message': 'Парсинг запущен'})
+    """Запуск парсинга с параметрами (redirect to /api/parser/start)"""
+    # Перенаправляем на основной метод
+    return start_parser()
 
 @app.route('/api/activity/stream')
 def activity_stream():

@@ -138,6 +138,25 @@
                                     <div id="parsing-stats">
                                         <p class="text-muted">Парсинг не запущен</p>
                                     </div>
+                                    <div id="parsing-details" style="display:none;">
+                                        <div class="mb-3">
+                                            <small class="text-muted">Текущая операция:</small>
+                                            <div class="fw-bold" id="current-operation">-</div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <small class="text-muted">Текущий чат:</small>
+                                            <div id="current-chat-name">-</div>
+                                        </div>
+                                        <div class="progress mb-2">
+                                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                 id="parsing-progress-bar" 
+                                                 role="progressbar" 
+                                                 style="width: 0%">0%</div>
+                                        </div>
+                                        <small class="text-muted">
+                                            Обработано чатов: <span id="processed-chats">0</span> / <span id="total-chats">0</span>
+                                        </small>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -302,7 +321,7 @@ async function updateStatuses() {
     try {
         const parserResp = await fetch('/api/parser/status');
         const parserData = await parserResp.json();
-        updateParserStatus(parserData.is_active);
+        updateParserStatus(parserData.is_active, parserData.details);
     } catch (e) {
         console.error('Error updating parser status:', e);
     }
@@ -317,18 +336,55 @@ async function updateStatuses() {
     }
 }
 
-function updateParserStatus(isActive) {
+function updateParserStatus(isActive, details = null) {
     const badge = document.querySelector('#parser-status-sidebar .badge');
     const progress = document.getElementById('parser-progress');
+    const parsingStats = document.getElementById('parsing-stats');
+    const parsingDetails = document.getElementById('parsing-details');
     
-    if (isActive) {
+    if (isActive && details) {
         badge.className = 'badge bg-success';
         badge.innerHTML = '<i class="bi bi-circle-fill"></i> Активен';
         progress.style.display = 'block';
+        
+        // Обновляем детали парсинга
+        parsingStats.style.display = 'none';
+        parsingDetails.style.display = 'block';
+        
+        document.getElementById('current-operation').textContent = details.current_operation || 'Обработка...';
+        document.getElementById('current-chat-name').textContent = details.current_chat || '-';
+        
+        if (details.progress) {
+            const processed = details.progress.processed_chats || 0;
+            const total = details.progress.total_chats || 0;
+            const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
+            
+            document.getElementById('processed-chats').textContent = processed;
+            document.getElementById('total-chats').textContent = total;
+            
+            const progressBar = document.getElementById('parsing-progress-bar');
+            progressBar.style.width = percentage + '%';
+            progressBar.textContent = percentage + '%';
+            
+            // Обновляем прогресс в сайдбаре
+            const sidebarProgress = document.querySelector('#parser-progress .progress-bar');
+            if (sidebarProgress) {
+                sidebarProgress.style.width = percentage + '%';
+            }
+            
+            const sidebarCurrent = document.getElementById('parser-current-chat');
+            if (sidebarCurrent) {
+                sidebarCurrent.textContent = details.current_chat || '-';
+            }
+        }
     } else {
         badge.className = 'badge bg-secondary';
         badge.innerHTML = '<i class="bi bi-circle"></i> Неактивен';
         progress.style.display = 'none';
+        
+        // Показываем заглушку
+        parsingStats.style.display = 'block';
+        parsingDetails.style.display = 'none';
     }
 }
 
