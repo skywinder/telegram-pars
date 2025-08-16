@@ -5,6 +5,8 @@
 import asyncio
 import argparse
 import sys
+import signal
+import os
 from datetime import datetime
 from telegram_parser import TelegramParser
 from data_exporter import DataExporter

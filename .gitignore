@@ -67,3 +67,14 @@ lib/
 lib64/
 share/
 pyvenv.cfg
+
+# Runtime files
+parsing.pid
+monitor.pid
+*.pid
+data/parser_status.json
+monitor_status.json
+
+# Logs
+logs/
+*.log

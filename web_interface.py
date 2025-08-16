@@ -6,6 +6,7 @@ import os
 import json
 import sqlite3
 import asyncio
+import signal
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, Response
 from analytics import TelegramAnalytics
@@ -20,6 +21,7 @@ import time
 from json_utils import safe_json_dumps
 from monitor_manager import MonitorManager
 from session_manager import SessionManager
+from logger_config import log_info, log_error, log_warning
 
 # Создаем Flask приложение
 app = Flask(__name__)
@@ -54,12 +56,15 @@ def init_app():
             ai_exporter = AIExporter(db_path)
             db = TelegramDatabase(db_path)
             print("✅ База данных подключена")
+            log_info('web', f"База данных подключена: {db_path}")
             return True
         except Exception as e:
             print(f"❌ Ошибка подключения к БД: {e}")
+            log_error('web', f"Ошибка подключения к БД: {e}", {'db_path': db_path})
             return False
     else:
         print("⚠️ База данных не найдена. Запустите сначала парсинг.")
+        log_warning('web', f"База данных не найдена: {db_path}")
         return False
 
 def transform_chat_data(raw_chat):
@@ -1441,8 +1446,16 @@ def add_activity_log(message, level='info'):
             'message': message,
             'level': level
         })
-    except:
-        pass
+        
+        # Также логируем в файл
+        if level == 'error':
+            log_error('web', message)
+        elif level == 'warning':
+            log_warning('web', message)
+        else:
+            log_info('web', message)
+    except Exception as e:
+        log_error('web', f"Ошибка добавления в activity log: {e}")
 
 @app.route('/api/activity/stream')
 def activity_stream():
@@ -1550,6 +1563,26 @@ def start_parser():
 def stop_parser():
     """Остановка парсера"""
     StatusManager.request_interruption()
+    
+    # Пытаемся остановить процесс по PID
+    try:
+        if os.path.exists('parsing.pid'):
+            with open('parsing.pid', 'r') as f:
+                pid = int(f.read().strip())
+            
+            # Проверяем, существует ли процесс
+            try:
+                os.kill(pid, 0)  # Проверка существования
+                os.kill(pid, signal.SIGTERM)  # Мягкая остановка
+                add_activity_log(f"🛑 Отправлен сигнал остановки процессу {pid}", 'info')
+            except OSError:
+                add_activity_log("⚠️ Процесс парсера уже завершен", 'warning')
+            
+            # Удаляем PID файл
+            os.remove('parsing.pid')
+    except Exception as e:
+        add_activity_log(f"⚠️ Ошибка при остановке парсера: {e}", 'warning')
+    
     return jsonify({'success': True, 'message': 'Запрошена остановка парсера'})
 
 @app.route('/api/monitor/start', methods=['POST'])
@@ -1600,25 +1633,6 @@ def start_parsing():
     # Перенаправляем на основной метод
     return start_parser()
 
-@app.route('/api/activity/stream')
-def activity_stream():
-    """SSE поток для логов активности"""
-    def generate():
-        # Отправляем heartbeat
-        yield f"data: {safe_json_dumps({'message': 'Подключено к потоку активности', 'type': 'info'})}\n\n"
-        
-        while True:
-            try:
-                # Проверяем статус и отправляем обновления
-                status = StatusManager.get_status()
-                if status:
-                    yield f"data: {safe_json_dumps({'message': f'Парсинг: {status.get("current_chat", "...")}', 'type': 'info'})}\n\n"
-                
-                time.sleep(2)
-            except GeneratorExit:
-                break
-    
-    return Response(generate(), mimetype="text/event-stream")
 
 @app.route('/api/settings')
 def get_settings():

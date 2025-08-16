@@ -14,6 +14,7 @@ from telethon.tl.functions.account import GetAuthorizationsRequest
 from database import TelegramDatabase
 import config
 from realtime_monitor import RealtimeMonitor, set_monitor_instance
+from logger_config import log_info, log_error, log_warning
 
 class TelegramParser:
     """
@@ -158,6 +159,7 @@ class TelegramParser:
 
                 if wait_time > max_wait:
                     print(f"🚫 Слишком долгое ожидание ({wait_time}s), пропускаем запрос")
+                    log_warning('parser', f"FloodWait превышает лимит: {wait_time}s > {max_wait}s")
                     raise
 
                 backoff = self.rate_limits.get('backoff_multiplier', 1.5) ** (attempt + 1)
@@ -271,6 +273,8 @@ class TelegramParser:
 
         except Exception as e:
             print(f"❌ Ошибка при получении списка чатов: {e}")
+            log_error('parser', f"Ошибка при получении списка чатов: {e}", 
+                     {'method': 'get_chats_list'})
             self.session_stats['errors'] += 1
 
         print(f"📁 Найдено {len(chats)} чатов")
@@ -326,6 +330,8 @@ class TelegramParser:
             
         except Exception as e:
             print(f"❌ Ошибка при парсинге чата {chat_name}: {e}")
+            log_error('parser', f"Ошибка при парсинге чата {chat_name}: {e}", 
+                     {'chat_id': chat_id, 'chat_name': chat_name})
             self.session_stats['errors'] += 1
             return []
     
